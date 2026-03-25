@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EBS Image Gallery</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0f1117;
+    --surface:   #1a1d27;
+    --surface2:  #22263a;
+    --border:    #2e3348;
+    --accent:    #4f8ef7;
+    --accent-h:  #3a7af0;
+    --text:      #e2e6f0;
+    --muted:     #7a82a0;
+    --danger:    #e05252;
+    --success:   #3ecf8e;
+    --radius:    10px;
+    --shadow:    0 4px 24px rgba(0,0,0,.45);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo { font-size: 17px; font-weight: 600; letter-spacing: -.3px; }
+  .logo span { color: var(--accent); }
+  #status-bar { font-size: 12px; color: var(--muted); }
+  #status-bar b { color: var(--text); }
+
+  /* ── Upload zone ── */
+  .upload-zone {
+    margin: 32px auto;
+    max-width: 760px;
+    background: var(--surface);
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 36px 28px;
+    transition: border-color .2s, background .2s;
+  }
+  .upload-zone.drag { border-color: var(--accent); background: #1c2240; }
+  .upload-zone h2 { font-size: 15px; font-weight: 500; margin-bottom: 18px; color: var(--muted); }
+
+  .upload-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  .file-label {
+    flex: 1;
+    min-width: 160px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 9px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: border-color .2s;
+  }
+  .file-label:hover { border-color: var(--accent); color: var(--text); }
+  .file-label input { display: none; }
+  .file-label .fname { color: var(--text); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
+
+  input[type=text] {
+    flex: 2;
+    min-width: 160px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 9px 14px;
+    font-size: 13px;
+    color: var(--text);
+    outline: none;
+    transition: border-color .2s;
+  }
+  input[type=text]:focus { border-color: var(--accent); }
+  input[type=text]::placeholder { color: var(--muted); }
+
+  button.primary {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    padding: 9px 22px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .15s, opacity .15s;
+    white-space: nowrap;
+  }
+  button.primary:hover { background: var(--accent-h); }
+  button.primary:disabled { opacity: .45; cursor: not-allowed; }
+
+  #upload-msg { margin-top: 10px; font-size: 12px; min-height: 18px; }
+  #upload-msg.ok  { color: var(--success); }
+  #upload-msg.err { color: var(--danger); }
+
+  /* Progress bar */
+  .progress-wrap { margin-top: 10px; background: var(--surface2); border-radius: 4px; height: 4px; overflow: hidden; display: none; }
+  .progress-bar  { height: 100%; background: var(--accent); width: 0; transition: width .15s; border-radius: 4px; }
+
+  /* ── Gallery grid ── */
+  .gallery-wrap {
+    max-width: 1160px;
+    margin: 0 auto 60px;
+    padding: 0 24px;
+  }
+  .gallery-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  .gallery-header h2 { font-size: 14px; font-weight: 500; color: var(--muted); }
+  #img-count { color: var(--text); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: transform .15s, box-shadow .15s;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+
+  .thumb-wrap {
+    position: relative;
+    width: 100%;
+    padding-top: 66%;
+    background: var(--surface2);
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .thumb-wrap img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform .2s;
+  }
+  .card:hover .thumb-wrap img { transform: scale(1.04); }
+
+  .card-body {
+    padding: 10px 12px 12px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .card-caption {
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+    min-height: 18px;
+    border-radius: 4px;
+    padding: 2px 4px;
+    transition: background .15s;
+    word-break: break-word;
+  }
+  .card-caption:hover { background: var(--surface2); }
+  .card-caption.empty { color: var(--muted); font-style: italic; }
+  .card-caption input {
+    background: transparent;
+    border: none;
+    outline: none;
+    width: 100%;
+    font-size: 13px;
+    color: var(--text);
+    font-family: inherit;
+  }
+
+  .card-meta { font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; }
+
+  .card-actions { display: flex; gap: 6px; margin-top: 4px; }
+  .btn-del {
+    margin-left: auto;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 11px;
+    padding: 3px 10px;
+    cursor: pointer;
+    transition: border-color .15s, color .15s;
+  }
+  .btn-del:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* ── Lightbox ── */
+  #lightbox {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.85);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    padding: 24px;
+  }
+  #lightbox.open { display: flex; }
+  #lightbox img {
+    max-width: 90vw;
+    max-height: 80vh;
+    border-radius: var(--radius);
+    object-fit: contain;
+    box-shadow: var(--shadow);
+  }
+  #lightbox p { color: var(--text); font-size: 14px; max-width: 600px; text-align: center; }
+  #lightbox-close {
+    position: absolute;
+    top: 20px; right: 28px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 28px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  #lightbox-close:hover { color: var(--text); }
+
+  /* ── Empty state ── */
+  .empty {
+    text-align: center;
+    padding: 80px 0;
+    color: var(--muted);
+    font-size: 14px;
+    grid-column: 1/-1;
+  }
+  .empty .icon { font-size: 48px; margin-bottom: 12px; opacity: .4; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">EBS <span>Gallery</span></div>
+  <div id="status-bar">loading…</div>
+</header>
+
+<div class="upload-zone" id="drop-zone">
+  <h2>Upload images (jpg, png, gif, webp)</h2>
+  <div class="upload-row">
+    <label class="file-label">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+      <span id="fname-display">Choose file…</span>
+      <input type="file" id="file-input" accept="image/*">
+    </label>
+    <input type="text" id="caption-input" placeholder="Caption (optional)" maxlength="200">
+    <button class="primary" id="upload-btn" disabled>Upload</button>
+  </div>
+  <div class="progress-wrap" id="prog-wrap"><div class="progress-bar" id="prog-bar"></div></div>
+  <div id="upload-msg"></div>
+</div>
+
+<div class="gallery-wrap">
+  <div class="gallery-header">
+    <h2><span id="img-count">0</span> images stored on EBS</h2>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<div id="lightbox">
+  <button id="lightbox-close">&times;</button>
+  <img id="lb-img" src="" alt="">
+  <p id="lb-caption"></p>
+</div>
+
+<script>
+const grid      = document.getElementById('grid');
+const fileInput = document.getElementById('file-input');
+const uploadBtn = document.getElementById('upload-btn');
+const captionIn = document.getElementById('caption-input');
+const uploadMsg = document.getElementById('upload-msg');
+const progWrap  = document.getElementById('prog-wrap');
+const progBar   = document.getElementById('prog-bar');
+const statusBar = document.getElementById('status-bar');
+const countEl   = document.getElementById('img-count');
+const dropZone  = document.getElementById('drop-zone');
+const lightbox  = document.getElementById('lightbox');
+const lbImg     = document.getElementById('lb-img');
+const lbCap     = document.getElementById('lb-caption');
+
+// ─── Status ───────────────────────────────────────────────────────────────
+async function loadStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    statusBar.innerHTML = `<b>${d.image_count}</b> images &nbsp;·&nbsp; <b>${d.total_size_mb} MB</b> on EBS &nbsp;·&nbsp; ${d.data_dir}`;
+  } catch { statusBar.textContent = 'server unreachable'; }
+}
+
+// ─── Gallery ──────────────────────────────────────────────────────────────
+async function loadImages() {
+  const r    = await fetch('/api/images');
+  const imgs = await r.json();
+  countEl.textContent = imgs.length;
+  grid.innerHTML = '';
+  if (!imgs.length) {
+    grid.innerHTML = '<div class="empty"><div class="icon">🖼</div>No images yet — upload one above</div>';
+    return;
+  }
+  imgs.forEach(renderCard);
+}
+
+function renderCard(img) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.dataset.id = img.id;
+
+  const dateStr = new Date(img.uploaded_at).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+  const sizeStr = img.size_bytes > 1048576
+    ? (img.size_bytes/1048576).toFixed(1) + ' MB'
+    : Math.round(img.size_bytes/1024) + ' KB';
+
+  card.innerHTML = `
+    <div class="thumb-wrap">
+      <img src="/images/${img.filename}" alt="${img.original}" loading="lazy">
+    </div>
+    <div class="card-body">
+      <div class="card-caption ${img.caption ? '' : 'empty'}" title="Click to edit">${img.caption || 'Add caption…'}</div>
+      <div class="card-meta"><span>${dateStr}</span><span>${sizeStr}</span></div>
+      <div class="card-actions">
+        <button class="btn-del">Delete</button>
+      </div>
+    </div>`;
+
+  // Lightbox
+  card.querySelector('.thumb-wrap').addEventListener('click', () => {
+    lbImg.src    = `/images/${img.filename}`;
+    lbCap.textContent = img.caption || img.original;
+    lightbox.classList.add('open');
+  });
+
+  // Inline caption edit
+  const capEl = card.querySelector('.card-caption');
+  capEl.addEventListener('click', () => {
+    const old = img.caption || '';
+    capEl.innerHTML = `<input type="text" value="${old.replace(/"/g,'&quot;')}" maxlength="200" placeholder="Add caption…">`;
+    const inp = capEl.querySelector('input');
+    inp.focus();
+    const save = async () => {
+      const val = inp.value.trim();
+      await fetch(`/api/images/${img.id}/caption`, {
+        method: 'PATCH',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({caption: val})
+      });
+      img.caption = val;
+      capEl.textContent = val || 'Add caption…';
+      capEl.className = `card-caption ${val ? '' : 'empty'}`;
+    };
+    inp.addEventListener('blur', save);
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); });
+  });
+
+  // Delete
+  card.querySelector('.btn-del').addEventListener('click', async () => {
+    if (!confirm(`Delete "${img.original}"?`)) return;
+    await fetch(`/api/images/${img.id}`, {method:'DELETE'});
+    card.remove();
+    const remaining = grid.querySelectorAll('.card').length;
+    countEl.textContent = remaining;
+    if (!remaining) grid.innerHTML = '<div class="empty"><div class="icon">🖼</div>No images yet — upload one above</div>';
+    loadStatus();
+  });
+
+  grid.appendChild(card);
+}
+
+// ─── Upload ───────────────────────────────────────────────────────────────
+fileInput.addEventListener('change', () => {
+  const f = fileInput.files[0];
+  document.getElementById('fname-display').textContent = f ? f.name : 'Choose file…';
+  uploadBtn.disabled = !f;
+});
+
+uploadBtn.addEventListener('click', doUpload);
+
+async function doUpload() {
+  const file = fileInput.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('caption', captionIn.value.trim());
+
+  uploadBtn.disabled = true;
+  uploadMsg.textContent = '';
+  uploadMsg.className = '';
+  progWrap.style.display = 'block';
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/upload');
+
+  xhr.upload.onprogress = e => {
+    if (e.lengthComputable) {
+      progBar.style.width = (e.loaded / e.total * 100) + '%';
+    }
+  };
+
+  xhr.onload = () => {
+    progWrap.style.display = 'none';
+    progBar.style.width = '0';
+    if (xhr.status === 201) {
+      const record = JSON.parse(xhr.responseText);
+      // Remove empty state if present
+      const empty = grid.querySelector('.empty');
+      if (empty) empty.remove();
+      // Prepend card
+      const tempGrid = document.createElement('div');
+      grid.prepend(tempGrid);
+      // Use renderCard to a temp element then move
+      const before = grid.firstChild;
+      renderCard(record);
+      const newCard = grid.querySelector('[data-id="'+record.id+'"]');
+      grid.insertBefore(newCard, before);
+      countEl.textContent = grid.querySelectorAll('.card').length;
+      uploadMsg.textContent = '✓ Uploaded successfully';
+      uploadMsg.className = 'ok';
+      fileInput.value = '';
+      captionIn.value = '';
+      document.getElementById('fname-display').textContent = 'Choose file…';
+      uploadBtn.disabled = true;
+      loadStatus();
+    } else {
+      const err = JSON.parse(xhr.responseText);
+      uploadMsg.textContent = '✗ ' + (err.error || 'Upload failed');
+      uploadMsg.className = 'err';
+      uploadBtn.disabled = false;
+    }
+  };
+  xhr.onerror = () => {
+    progWrap.style.display = 'none';
+    uploadMsg.textContent = '✗ Network error';
+    uploadMsg.className = 'err';
+    uploadBtn.disabled = false;
+  };
+  xhr.send(fd);
+}
+
+// ─── Drag & drop ──────────────────────────────────────────────────────────
+['dragenter','dragover'].forEach(ev => {
+  dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('drag'); });
+});
+['dragleave','drop'].forEach(ev => {
+  dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove('drag'); });
+});
+dropZone.addEventListener('drop', e => {
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  fileInput.files = dt.files;
+  document.getElementById('fname-display').textContent = file.name;
+  uploadBtn.disabled = false;
+});
+
+// ─── Lightbox ─────────────────────────────────────────────────────────────
+document.getElementById('lightbox-close').addEventListener('click', () => lightbox.classList.remove('open'));
+lightbox.addEventListener('click', e => { if (e.target === lightbox) lightbox.classList.remove('open'); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') lightbox.classList.remove('open'); });
+
+// ─── Init ─────────────────────────────────────────────────────────────────
+loadImages();
+loadStatus();
+</script>
+</body>
+</html>

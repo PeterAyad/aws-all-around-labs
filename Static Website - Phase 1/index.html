@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SN▓KE</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green: #39ff6a;
+      --green-dim: #1a7a35;
+      --green-glow: rgba(57,255,106,0.35);
+      --bg: #050e08;
+      --grid: #0a1f0f;
+      --red: #ff3939;
+      --amber: #ffb800;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      color: var(--green);
+      font-family: 'Share Tech Mono', monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* Scanlines overlay */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.18) 2px,
+        rgba(0,0,0,0.18) 4px
+      );
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    /* CRT vignette */
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.75) 100%);
+      pointer-events: none;
+      z-index: 99;
+    }
+
+    .shell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header */
+    .title {
+      font-family: 'VT323', monospace;
+      font-size: clamp(2.8rem, 8vw, 5rem);
+      letter-spacing: 0.15em;
+      color: var(--green);
+      text-shadow: 0 0 12px var(--green-glow), 0 0 40px var(--green-glow);
+      animation: flicker 6s infinite;
+    }
+
+    @keyframes flicker {
+      0%,95%,100% { opacity: 1; }
+      96% { opacity: 0.7; }
+      97% { opacity: 1; }
+      98% { opacity: 0.5; }
+      99% { opacity: 1; }
+    }
+
+    /* HUD */
+    .hud {
+      display: flex;
+      gap: 3rem;
+      font-size: 0.85rem;
+      letter-spacing: 0.12em;
+      color: var(--green-dim);
+    }
+
+    .hud span { color: var(--green); }
+
+    /* Canvas wrapper */
+    .canvas-wrap {
+      position: relative;
+      border: 1px solid var(--green-dim);
+      box-shadow: 0 0 0 1px var(--green-dim),
+                  0 0 20px var(--green-glow),
+                  inset 0 0 30px rgba(57,255,106,0.04);
+    }
+
+    canvas {
+      display: block;
+      image-rendering: pixelated;
+    }
+
+    /* Overlay (start / game over) */
+    .overlay {
+      position: absolute; inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      background: rgba(5,14,8,0.88);
+      backdrop-filter: blur(1px);
+      transition: opacity 0.3s;
+    }
+
+    .overlay.hidden { opacity: 0; pointer-events: none; }
+
+    .overlay-title {
+      font-family: 'VT323', monospace;
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      letter-spacing: 0.1em;
+      text-shadow: 0 0 16px var(--green-glow);
+    }
+
+    .overlay-title.dead { color: var(--red); text-shadow: 0 0 16px rgba(255,56,56,0.5); }
+
+    .overlay-sub {
+      font-size: 0.78rem;
+      color: var(--green-dim);
+      letter-spacing: 0.15em;
+      text-align: center;
+      line-height: 1.9;
+    }
+
+    .blink { animation: blink 1s step-end infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    /* Mobile controls */
+    .mobile-controls {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .ctrl-row { display: flex; gap: 6px; }
+
+    .ctrl-btn {
+      width: 52px; height: 52px;
+      background: transparent;
+      border: 1px solid var(--green-dim);
+      color: var(--green);
+      font-family: 'VT323', monospace;
+      font-size: 1.5rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.1s, box-shadow 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .ctrl-btn:active {
+      background: rgba(57,255,106,0.15);
+      box-shadow: 0 0 10px var(--green-glow);
+    }
+
+    @media (pointer: coarse) {
+      .mobile-controls { display: flex; }
+    }
+
+    @media (max-width: 520px) {
+      .mobile-controls { display: flex; }
+    }
+
+    .footer-hint {
+      font-size: 0.68rem;
+      color: var(--green-dim);
+      letter-spacing: 0.1em;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="shell">
+  <div class="title">SN▓KE</div>
+
+  <div class="hud">
+    <div>SCORE&nbsp;<span id="score">000</span></div>
+    <div>BEST&nbsp;&nbsp;<span id="best">000</span></div>
+    <div>LVL&nbsp;&nbsp;&nbsp;<span id="level">1</span></div>
+  </div>
+
+  <div class="canvas-wrap">
+    <canvas id="c"></canvas>
+
+    <div class="overlay" id="overlay">
+      <div class="overlay-title" id="overlay-title">READY</div>
+      <div class="overlay-sub" id="overlay-sub">
+        ARROWS / WASD TO MOVE<br>
+        <span class="blink">[ PRESS ANY KEY TO START ]</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="mobile-controls">
+    <div class="ctrl-row">
+      <button class="ctrl-btn" id="btn-up">▲</button>
+    </div>
+    <div class="ctrl-row">
+      <button class="ctrl-btn" id="btn-left">◄</button>
+      <button class="ctrl-btn" id="btn-down">▼</button>
+      <button class="ctrl-btn" id="btn-right">►</button>
+    </div>
+  </div>
+
+  <div class="footer-hint">SWIPE OR USE ARROW KEYS &nbsp;·&nbsp; AVOID YOURSELF</div>
+</div>
+
+<script>
+  // ── Config ──────────────────────────────────────────────
+  const COLS = 24, ROWS = 24, CELL = 22;
+  const BASE_INTERVAL = 150; // ms
+
+  // ── Canvas setup ────────────────────────────────────────
+  const canvas = document.getElementById('c');
+  const ctx    = canvas.getContext('2d');
+  canvas.width  = COLS * CELL;
+  canvas.height = ROWS * CELL;
+
+  // ── State ────────────────────────────────────────────────
+  let snake, dir, nextDir, food, score, best, level, gameLoop, running, dead;
+
+  function init() {
+    snake   = [{x:12,y:12},{x:11,y:12},{x:10,y:12}];
+    dir     = {x:1,y:0};
+    nextDir = {x:1,y:0};
+    score   = 0;
+    level   = 1;
+    dead    = false;
+    running = false;
+    best    = parseInt(localStorage.getItem('sn_best')||'0');
+    placeFood();
+    updateHUD();
+    draw();
+  }
+
+  function placeFood() {
+    let pos;
+    do {
+      pos = {x: Math.floor(Math.random()*COLS), y: Math.floor(Math.random()*ROWS)};
+    } while (snake.some(s=>s.x===pos.x&&s.y===pos.y));
+    food = pos;
+  }
+
+  // ── Game loop ────────────────────────────────────────────
+  function startLoop() {
+    if (gameLoop) clearInterval(gameLoop);
+    const speed = Math.max(60, BASE_INTERVAL - (level-1)*12);
+    gameLoop = setInterval(tick, speed);
+  }
+
+  function tick() {
+    if (!running) return;
+    dir = {...nextDir};
+
+    const head = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
+
+    // Wall collision
+    if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) { return endGame(); }
+    // Self collision
+    if (snake.some(s=>s.x===head.x&&s.y===head.y)) { return endGame(); }
+
+    snake.unshift(head);
+
+    if (head.x===food.x && head.y===food.y) {
+      score += 10 * level;
+      if (score > best) { best = score; localStorage.setItem('sn_best', best); }
+      level = Math.floor(snake.length / 5) + 1;
+      placeFood();
+      startLoop(); // recalc speed
+    } else {
+      snake.pop();
+    }
+
+    updateHUD();
+    draw();
+  }
+
+  function endGame() {
+    clearInterval(gameLoop);
+    running = false; dead = true;
+    draw();
+    showOverlay(true);
+  }
+
+  // ── Drawing ───────────────────────────────────────────────
+  const GREEN      = '#39ff6a';
+  const GREEN_DIM  = '#1a7a35';
+  const GREEN_DARK = '#0d3d1c';
+  const BG         = '#050e08';
+  const RED        = '#ff3939';
+  const AMBER      = '#ffb800';
+
+  function draw() {
+    // Background
+    ctx.fillStyle = BG;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // Subtle grid
+    ctx.strokeStyle = '#0a1f0f';
+    ctx.lineWidth   = 0.5;
+    for (let x=0;x<=COLS;x++){
+      ctx.beginPath(); ctx.moveTo(x*CELL,0); ctx.lineTo(x*CELL,canvas.height); ctx.stroke();
+    }
+    for (let y=0;y<=ROWS;y++){
+      ctx.beginPath(); ctx.moveTo(0,y*CELL); ctx.lineTo(canvas.width,y*CELL); ctx.stroke();
+    }
+
+    // Food — pulsing dot
+    const t = Date.now() / 500;
+    const pulse = 0.7 + 0.3 * Math.sin(t * Math.PI * 2);
+    ctx.save();
+    ctx.shadowColor = AMBER;
+    ctx.shadowBlur  = 12 * pulse;
+    ctx.fillStyle   = AMBER;
+    const fp = 5;
+    ctx.fillRect(food.x*CELL+fp, food.y*CELL+fp, CELL-fp*2, CELL-fp*2);
+    ctx.restore();
+
+    // Snake
+    snake.forEach((seg, i) => {
+      const isHead = i === 0;
+      const alpha  = dead ? 0.4 : 1;
+      const color  = dead ? RED : (isHead ? GREEN : GREEN_DIM);
+
+      ctx.save();
+      if (!dead) {
+        ctx.shadowColor = isHead ? GREEN : 'transparent';
+        ctx.shadowBlur  = isHead ? 14 : 0;
+      }
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle   = color;
+
+      const pad = isHead ? 1 : 2;
+      ctx.fillRect(seg.x*CELL+pad, seg.y*CELL+pad, CELL-pad*2, CELL-pad*2);
+
+      // Head direction indicator
+      if (isHead && !dead) {
+        ctx.fillStyle = BG;
+        const ew=5,eh=5;
+        // Eyes based on direction
+        if (dir.x===1)       { ctx.fillRect(seg.x*CELL+CELL-6,seg.y*CELL+4,3,3); ctx.fillRect(seg.x*CELL+CELL-6,seg.y*CELL+CELL-7,3,3); }
+        else if (dir.x===-1) { ctx.fillRect(seg.x*CELL+3,seg.y*CELL+4,3,3);      ctx.fillRect(seg.x*CELL+3,seg.y*CELL+CELL-7,3,3); }
+        else if (dir.y===-1) { ctx.fillRect(seg.x*CELL+4,seg.y*CELL+3,3,3);      ctx.fillRect(seg.x*CELL+CELL-7,seg.y*CELL+3,3,3); }
+        else                  { ctx.fillRect(seg.x*CELL+4,seg.y*CELL+CELL-6,3,3); ctx.fillRect(seg.x*CELL+CELL-7,seg.y*CELL+CELL-6,3,3); }
+      }
+
+      ctx.restore();
+    });
+
+    if (!dead && running) requestAnimationFrame(draw);
+    else if (!running && !dead) requestAnimationFrame(draw); // idle food pulse
+  }
+
+  // ── HUD ──────────────────────────────────────────────────
+  function pad(n) { return String(n).padStart(3,'0'); }
+  function updateHUD() {
+    document.getElementById('score').textContent = pad(score);
+    document.getElementById('best').textContent  = pad(best);
+    document.getElementById('level').textContent = level;
+  }
+
+  // ── Overlay ──────────────────────────────────────────────
+  const overlay     = document.getElementById('overlay');
+  const overlayTitle = document.getElementById('overlay-title');
+  const overlaySub   = document.getElementById('overlay-sub');
+
+  function showOverlay(isGameOver) {
+    overlay.classList.remove('hidden');
+    if (isGameOver) {
+      overlayTitle.textContent = 'GAME OVER';
+      overlayTitle.className   = 'overlay-title dead';
+      overlaySub.innerHTML     = `SCORE&nbsp;&nbsp;${pad(score)}<br>BEST&nbsp;&nbsp;&nbsp;${pad(best)}<br><br><span class="blink">[ PRESS ANY KEY TO RETRY ]</span>`;
+    } else {
+      overlayTitle.textContent = 'READY';
+      overlayTitle.className   = 'overlay-title';
+      overlaySub.innerHTML     = `ARROWS / WASD TO MOVE<br><span class="blink">[ PRESS ANY KEY TO START ]</span>`;
+    }
+  }
+
+  function hideOverlay() { overlay.classList.add('hidden'); }
+
+  // ── Input ─────────────────────────────────────────────────
+  const DIRS = {
+    ArrowUp:    {x:0,y:-1}, w:{x:0,y:-1}, W:{x:0,y:-1},
+    ArrowDown:  {x:0,y:1},  s:{x:0,y:1},  S:{x:0,y:1},
+    ArrowLeft:  {x:-1,y:0}, a:{x:-1,y:0}, A:{x:-1,y:0},
+    ArrowRight: {x:1,y:0},  d:{x:1,y:0},  D:{x:1,y:0},
+  };
+
+  function handleDir(d) {
+    if (!running) { startGame(); return; }
+    // Prevent reversing
+    if (d.x !== -dir.x || d.y !== -dir.y) nextDir = d;
+  }
+
+  document.addEventListener('keydown', e => {
+    if (DIRS[e.key]) { e.preventDefault(); handleDir(DIRS[e.key]); }
+    else if (!running) startGame();
+  });
+
+  // Mobile buttons
+  document.getElementById('btn-up').addEventListener('click',    ()=>handleDir({x:0,y:-1}));
+  document.getElementById('btn-down').addEventListener('click',  ()=>handleDir({x:0,y:1}));
+  document.getElementById('btn-left').addEventListener('click',  ()=>handleDir({x:-1,y:0}));
+  document.getElementById('btn-right').addEventListener('click', ()=>handleDir({x:1,y:0}));
+
+  // Touch swipe
+  let tx=0,ty=0;
+  canvas.addEventListener('touchstart', e=>{ tx=e.touches[0].clientX; ty=e.touches[0].clientY; e.preventDefault(); },{passive:false});
+  canvas.addEventListener('touchend',   e=>{
+    const dx=e.changedTouches[0].clientX-tx, dy=e.changedTouches[0].clientY-ty;
+    if (Math.abs(dx)<10 && Math.abs(dy)<10) { if(!running) startGame(); return; }
+    if (Math.abs(dx)>Math.abs(dy)) handleDir(dx>0?{x:1,y:0}:{x:-1,y:0});
+    else                           handleDir(dy>0?{x:0,y:1}:{x:0,y:-1});
+    e.preventDefault();
+  },{passive:false});
+
+  function startGame() {
+    if (dead || !running) { init(); }
+    hideOverlay();
+    running = true;
+    startLoop();
+    draw();
+  }
+
+  // ── Boot ──────────────────────────────────────────────────
+  init();
+  draw();
+  // keep food animating on idle
+  (function idlePulse() { if (!running) { draw(); requestAnimationFrame(idlePulse); } })();
+</script>
+
+</body>
+</html>

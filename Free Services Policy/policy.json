@@ -1,0 +1,259 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowRegionalLearningServices",
+            "Effect": "Allow",
+            "Action": [
+                "ec2:*",
+                "lambda:*",
+                "s3:*",
+                "rds:*",
+                "dynamodb:*",
+                "apigateway:*",
+                "acm:*",
+                "resource-explorer-2:*",
+                "servicecatalog:*",
+                "sqs:*",
+                "uxc:*",
+                "sns:*",
+                "events:*",
+                "cloudwatch:*",
+                "cloudtrail:*",
+                "codecommit:*",
+                "codebuild:*",
+                "codedeploy:*",
+                "codepipeline:*",
+                "amplify:*",
+                "kms:*",
+                "ssm:*",
+                "secretsmanager:*",
+                "cognito-identity:*",
+                "cognito-idp:*",
+                "sts:*",
+                "access-analyzer:*",
+                "resource-groups:*",
+                "resource-explorer:*",
+                "tag:*",
+                "route53:*",
+                "ecs:*",
+                "eks:*",
+                "ecr:*"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "StringEquals": {
+                    "aws:RequestedRegion": "us-east-1"
+                }
+            }
+        },
+        {
+            "Sid": "AllowGlobalServices",
+            "Effect": "Allow",
+            "Action": [
+                "cloudfront:*",
+                "ce:*",
+                "budgets:*",
+                "cur:*",
+                "aws-portal:*",
+                "cost-optimization-hub:*",
+                "organizations:Describe*",
+                "organizations:List*",
+                "support:*",
+                "trustedadvisor:*",
+                "billing:*",
+                "ram:*",
+                "freetier:*",
+                "health:*"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "AllowIAMWithGuardrails",
+            "Effect": "Allow",
+            "Action": [
+                "iam:*",
+                "sts:*"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "StringEqualsIfExists": {
+                    "iam:PassedToService": [
+                        "ec2.amazonaws.com",
+                        "lambda.amazonaws.com",
+                        "rds.amazonaws.com",
+                        "s3.amazonaws.com",
+                        "apigateway.amazonaws.com",
+                        "eks.amazonaws.com"
+                    ]
+                }
+            }
+        },
+        {
+            "Sid": "DenySpecificExpensiveRDSEngines",
+            "Effect": "Deny",
+            "Action": [
+                "rds:CreateDBInstance",
+                "rds:CreateDBCluster"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "StringLikeIfExists": {
+                    "rds:DatabaseEngine": [
+                        "neptune",
+                        "docdb"
+                    ]
+                }
+            }
+        },
+        {
+            "Sid": "DenyExpensiveEC2Instances",
+            "Effect": "Deny",
+            "Action": "ec2:RunInstances",
+            "Resource": "arn:aws:ec2:*:*:instance/*",
+            "Condition": {
+                "StringNotEquals": {
+                    "ec2:InstanceType": [
+                        "t3.micro",
+                        "t3.small",
+                        "t4g.micro",
+                        "t4g.small"
+                    ]
+                }
+            }
+        },
+        {
+            "Sid": "DenyLargeEBSVolumes",
+            "Effect": "Deny",
+            "Action": [
+                "ec2:CreateVolume",
+                "ec2:ModifyVolume"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "NumericGreaterThan": {
+                    "ec2:VolumeSize": "30"
+                }
+            }
+        },
+        {
+            "Sid": "DenyExpensiveEBSVolumeTypes",
+            "Effect": "Deny",
+            "Action": "ec2:CreateVolume",
+            "Resource": "*",
+            "Condition": {
+                "StringNotEqualsIfExists": {
+                    "ec2:VolumeType": [
+                        "gp2",
+                        "gp3"
+                    ]
+                }
+            }
+        },
+        {
+            "Sid": "DenyExpensiveRDSInstances",
+            "Effect": "Deny",
+            "Action": "rds:CreateDBInstance",
+            "Resource": "*",
+            "Condition": {
+                "StringNotEquals": {
+                    "rds:DatabaseClass": [
+                        "db.t3.micro",
+                        "db.t4g.micro"
+                    ]
+                }
+            }
+        },
+        {
+            "Sid": "DenyNonFreeTierRDSEngines",
+            "Effect": "Deny",
+            "Action": "rds:CreateDBInstance",
+            "Resource": "*",
+            "Condition": {
+                "StringNotEqualsIfExists": {
+                    "rds:DatabaseEngine": [
+                        "mysql",
+                        "postgres",
+                        "mariadb",
+                        "sqlserver-ex"
+                    ]
+                }
+            }
+        },
+        {
+            "Sid": "DenyLargeRDSStorage",
+            "Effect": "Deny",
+            "Action": [
+                "rds:CreateDBInstance",
+                "rds:ModifyDBInstance"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "NumericGreaterThan": {
+                    "rds:StorageSize": "20"
+                }
+            }
+        },
+        {
+            "Sid": "DenyMultiAZRDS",
+            "Effect": "Deny",
+            "Action": [
+                "rds:CreateDBInstance",
+                "rds:ModifyDBInstance"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "Bool": {
+                    "rds:MultiAZ": "true"
+                }
+            }
+        },
+        {
+            "Sid": "DenyPublicRDS",
+            "Effect": "Deny",
+            "Action": [
+                "rds:CreateDBInstance",
+                "rds:ModifyDBInstance"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "Bool": {
+                    "rds:PubliclyAccessible": "true"
+                }
+            }
+        },
+        {
+            "Sid": "DenyExpensiveS3StorageClasses",
+            "Effect": "Deny",
+            "Action": "s3:PutObject",
+            "Resource": "*",
+            "Condition": {
+                "StringNotEqualsIfExists": {
+                    "s3:x-amz-storage-class": [
+                        "STANDARD",
+                        "INTELLIGENT_TIERING"
+                    ]
+                }
+            }
+        },
+        {
+            "Sid": "LimitLambdaConcurrency",
+            "Effect": "Deny",
+            "Action": "lambda:PutFunctionConcurrency",
+            "Resource": "*"
+        },
+        {
+            "Sid": "DenyCommitmentPurchases",
+            "Effect": "Deny",
+            "Action": [
+                "ec2:PurchaseReservedInstancesOffering",
+                "rds:PurchaseReservedDBInstancesOffering",
+                "dynamodb:PurchaseReservedCapacityOfferings",
+                "savingsplans:CreateSavingsPlan",
+                "ec2:RequestSpotInstances",
+                "ec2:RequestSpotFleet"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
