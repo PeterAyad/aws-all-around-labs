@@ -1,6 +1,6 @@
 # AWS All Around Labs
 
-| AWS Service | Project / Use Case |
+| AWS Service | Lab |
 | :--- | :--- |
 | **IAM** | Free Services Policy |
 | **S3** | Static Website - Phase 1 |
