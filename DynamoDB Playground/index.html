@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Games · DynamoDB</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f7f6f3;
+  --surface: #ffffff;
+  --border: #e4e2dc;
+  --border2: #d0cdc4;
+  --text: #1a1916;
+  --muted: #8c8880;
+  --accent: #2563eb;
+  --accent-light: #eff4ff;
+  --danger: #dc2626;
+  --danger-light: #fef2f2;
+  --success: #16a34a;
+  --mono: 'DM Mono', monospace;
+  --sans: 'DM Sans', sans-serif;
+  --radius: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.08);
+}
+
+html, body { height: 100%; background: var(--bg); font-family: var(--sans); color: var(--text); font-size: 14px; }
+
+/* ── LAYOUT ── */
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+  gap: 20px;
+}
+
+/* ── HEADER ── */
+header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+header h1 {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.3px;
+}
+header h1 span { color: var(--accent); }
+header .subtitle {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--border2);
+  display: inline-block;
+  margin-left: auto;
+  transition: background .3s;
+}
+.status-dot.ok { background: var(--success); box-shadow: 0 0 0 3px rgba(22,163,74,.15); }
+.status-dot.err { background: var(--danger); }
+
+/* ── SECTION LABEL ── */
+.label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+/* ── CREDENTIALS ROW ── */
+.creds-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.creds-row input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  outline: none;
+  transition: border-color .15s;
+  box-shadow: var(--shadow);
+}
+.creds-row input::placeholder { color: var(--muted); }
+.creds-row input:focus { border-color: var(--accent); }
+
+/* ── BUTTONS ── */
+button {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: all .12s;
+  white-space: nowrap;
+  user-select: none;
+}
+button:hover { background: var(--bg); border-color: var(--border2); }
+button:active { transform: scale(.98); }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+button.primary:hover { background: #1d4fd8; border-color: #1d4fd8; }
+button.danger { background: var(--danger-light); color: var(--danger); border-color: #fca5a5; }
+button.danger:hover { background: #fee2e2; }
+button.connect { background: var(--text); color: #fff; border-color: var(--text); font-family: var(--mono); font-size: 12px; padding: 8px 18px; }
+button.connect:hover { background: #333; }
+button:disabled { opacity: .4; cursor: not-allowed; pointer-events: none; }
+button svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+/* ── ACTIONS ROW ── */
+.actions-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ── INSERT ROW ── */
+.insert-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.insert-row input, .insert-row select {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  transition: border-color .15s;
+  box-shadow: var(--shadow);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.insert-row input:focus, .insert-row select:focus { border-color: var(--accent); }
+.insert-row input[name="gameName"] { min-width: 180px; flex: 2; }
+.select-wrap { position: relative; flex: 1; min-width: 120px; }
+.select-wrap select { width: 100%; padding-right: 28px; }
+.select-wrap::after {
+  content: '↓';
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  font-size: 10px; color: var(--muted); pointer-events: none;
+}
+
+/* ── TABLE ── */
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.table-scroll { overflow-x: auto; overflow-y: auto; max-height: 420px; flex: 1; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+thead { position: sticky; top: 0; z-index: 1; }
+thead tr { background: var(--bg); border-bottom: 1px solid var(--border); }
+th {
+  padding: 10px 14px;
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+th:first-child { width: 36px; }
+td { padding: 11px 14px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #fafaf8; }
+tr.selected td { background: var(--accent-light); }
+
+input[type="checkbox"] {
+  width: 15px; height: 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-family: var(--mono);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.badge.pc { color: #0369a1; background: #f0f9ff; border-color: #bae6fd; }
+.badge.ps { color: #7c3aed; background: #f5f3ff; border-color: #ddd6fe; }
+.badge.xbox { color: #16a34a; background: #f0fdf4; border-color: #bbf7d0; }
+.badge.nintendo { color: #dc2626; background: #fef2f2; border-color: #fecaca; }
+.badge.mobile { color: #d97706; background: #fffbeb; border-color: #fde68a; }
+
+.empty-state {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  font-family: var(--mono);
+}
+.empty-state .icon { font-size: 28px; margin-bottom: 10px; display: block; }
+
+.table-footer {
+  padding: 9px 14px;
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── TOAST ── */
+#toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(12px);
+  background: var(--text); color: #fff;
+  padding: 9px 18px; border-radius: 20px;
+  font-size: 12px; font-family: var(--mono);
+  opacity: 0; transition: all .25s; pointer-events: none; z-index: 999;
+  white-space: nowrap;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.ok { background: var(--success); }
+#toast.err { background: var(--danger); }
+
+/* ── DIVIDER ── */
+hr { border: none; border-top: 1px solid var(--border); }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.loading { animation: pulse 1s infinite; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <header>
+    <h1>games <span>·</span> dynamodb</h1>
+    <span class="subtitle">table manager</span>
+    <span class="status-dot" id="dot" title="Not connected"></span>
+  </header>
+
+  <!-- CREDENTIALS -->
+  <div>
+    <div class="label">AWS Credentials</div>
+    <div class="creds-row">
+      <input type="text" id="accessKey" placeholder="Access Key ID" autocomplete="off" spellcheck="false">
+      <input type="password" id="secretKey" placeholder="Secret Access Key" autocomplete="off">
+      <select id="region" style="padding:8px 28px 8px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);font-family:var(--mono);font-size:12px;color:var(--text);box-shadow:var(--shadow);outline:none;-webkit-appearance:none;appearance:none;cursor:pointer">
+        <option value="us-east-1">us-east-1</option>
+        <option value="us-west-2">us-west-2</option>
+        <option value="eu-west-1">eu-west-1</option>
+        <option value="eu-central-1">eu-central-1</option>
+        <option value="ap-southeast-1">ap-southeast-1</option>
+        <option value="ap-northeast-1">ap-northeast-1</option>
+      </select>
+      <button class="connect" onclick="connect()">Connect</button>
+    </div>
+  </div>
+
+  <!-- TABLE PREVIEW -->
+  <div class="table-wrap">
+    <div class="table-scroll">
+      <table id="gamesTable">
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="selectAll" onchange="toggleAll(this)"></th>
+            <th>Game ID</th>
+            <th>Name</th>
+            <th>Platform</th>
+            <th>Category</th>
+            <th>Year</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr><td colspan="6"><div class="empty-state"><span class="icon">🎮</span>Connect and load the table to see games</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="table-footer">
+      <span id="tableCount">— items</span>
+      <span id="tableMsg" style="margin-left:auto"></span>
+    </div>
+  </div>
+
+  <!-- ACTION BUTTONS -->
+  <div>
+    <div class="label">Table Operations</div>
+    <div class="actions-row">
+      <button onclick="createTable()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="1.5"/><path d="M8 5v6M5 8h6"/></svg>
+        Create Table
+      </button>
+      <button class="danger" onclick="deleteTable()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4h10M6 4V3h4v1M5 4l.5 9h5L11 4"/></svg>
+        Delete Table
+      </button>
+      <button onclick="seedTable()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="5.5"/><path d="M8 5.5V8l2 1.5"/></svg>
+        Seed Table
+      </button>
+      <button onclick="refreshTable()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5"/><path d="M10 2.5h3.5V6"/></svg>
+        Refresh
+      </button>
+      <button class="danger" onclick="deleteSelected()" id="deleteSelBtn" style="margin-left:auto">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4h10M6 4V3h4v1M5 4l.5 9h5L11 4"/></svg>
+        Delete Selected
+      </button>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- INSERT GAME -->
+  <div>
+    <div class="label">Insert Game</div>
+    <div class="insert-row">
+      <input type="text" name="gameName" id="gameName" placeholder="Game name…">
+
+      <div class="select-wrap">
+        <select id="platform">
+          <option value="" disabled selected>Platform</option>
+          <option value="PC">PC</option>
+          <option value="PlayStation">PlayStation</option>
+          <option value="Xbox">Xbox</option>
+          <option value="Nintendo">Nintendo</option>
+          <option value="Mobile">Mobile</option>
+        </select>
+      </div>
+
+      <div class="select-wrap">
+        <select id="category">
+          <option value="" disabled selected>Category</option>
+          <option value="Action">Action</option>
+          <option value="Adventure">Adventure</option>
+          <option value="RPG">RPG</option>
+          <option value="Strategy">Strategy</option>
+          <option value="Sports">Sports</option>
+          <option value="Puzzle">Puzzle</option>
+          <option value="Shooter">Shooter</option>
+          <option value="Simulation">Simulation</option>
+          <option value="Horror">Horror</option>
+          <option value="Racing">Racing</option>
+        </select>
+      </div>
+
+      <div class="select-wrap">
+        <select id="year">
+          <option value="" disabled selected>Year</option>
+        </select>
+      </div>
+
+      <button class="primary" onclick="insertGame()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3v10M3 8h10"/></svg>
+        Insert Game
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── YEAR DROPDOWN ──
+const yearSel = document.getElementById('year');
+const now = new Date().getFullYear();
+for (let y = now; y >= 1980; y--) {
+  const o = document.createElement('option');
+  o.value = y; o.textContent = y;
+  yearSel.appendChild(o);
+}
+
+// ── STATE ──
+let creds = null;
+let selectedIds = new Set();
+
+// ── AWS SIG4 ──
+async function sha256hex(msg) {
+  const buf = typeof msg === 'string' ? new TextEncoder().encode(msg) : msg;
+  return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', buf))).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function hmac(key, msg) {
+  const k = key instanceof CryptoKey ? key : await crypto.subtle.importKey('raw', key instanceof Uint8Array ? key : new TextEncoder().encode(key), {name:'HMAC',hash:'SHA-256'}, false, ['sign']);
+  return new Uint8Array(await crypto.subtle.sign('HMAC', k, typeof msg === 'string' ? new TextEncoder().encode(msg) : msg));
+}
+async function hmacHex(key, msg) { return Array.from(await hmac(key, msg)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
+async function getSigningKey(secret, date, region, service) {
+  const kDate = await hmac(new TextEncoder().encode('AWS4'+secret), date);
+  const kRegion = await hmac(kDate, region);
+  const kService = await hmac(kRegion, service);
+  return hmac(kService, 'aws4_request');
+}
+
+async function ddb(action, payload) {
+  if (!creds) throw new Error('Not connected');
+  const { accessKey, secretKey, region } = creds;
+  const host = `dynamodb.${region}.amazonaws.com`;
+  const endpoint = `https://${host}`;
+  const body = JSON.stringify(payload);
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g,'').slice(0,15)+'Z';
+  const dateStamp = amzDate.slice(0,8);
+  const payloadHash = await sha256hex(body);
+  const canonHeaders = `content-type:application/x-amz-json-1.0\nhost:${host}\nx-amz-date:${amzDate}\n`;
+  const signedHeaders = 'content-type;host;x-amz-date';
+  const canonReq = `POST\n/\n\n${canonHeaders}\n${signedHeaders}\n${payloadHash}`;
+  const credScope = `${dateStamp}/${region}/dynamodb/aws4_request`;
+  const stringToSign = `AWS4-HMAC-SHA256\n${amzDate}\n${credScope}\n${await sha256hex(canonReq)}`;
+  const sigKey = await getSigningKey(secretKey, dateStamp, region, 'dynamodb');
+  const sig = await hmacHex(sigKey, stringToSign);
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-amz-json-1.0',
+      'X-Amz-Date': amzDate,
+      'X-Amz-Target': `DynamoDB_20120810.${action}`,
+      'Authorization': `AWS4-HMAC-SHA256 Credential=${accessKey}/${credScope}, SignedHeaders=${signedHeaders}, Signature=${sig}`,
+    },
+    body
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || data.Message || data.__type || 'Unknown error');
+  return data;
+}
+
+// ── MARSHAL ──
+function m(v) {
+  if (typeof v === 'number') return { N: String(v) };
+  if (typeof v === 'boolean') return { BOOL: v };
+  if (v === null) return { NULL: true };
+  return { S: String(v) };
+}
+function um(v) {
+  if (v.S !== undefined) return v.S;
+  if (v.N !== undefined) return Number(v.N);
+  if (v.BOOL !== undefined) return v.BOOL;
+  if (v.NULL) return null;
+  return v;
+}
+function umItem(item) {
+  const o = {};
+  for (const [k,v] of Object.entries(item)) o[k] = um(v);
+  return o;
+}
+
+// ── TOAST ──
+function toast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `show ${type}`;
+  setTimeout(()=>t.className='', 2400);
+}
+
+// ── STATUS DOT ──
+function setDot(state) {
+  const d = document.getElementById('dot');
+  d.className = 'status-dot ' + (state==='ok'?'ok':state==='err'?'err':'');
+}
+
+// ── CONNECT ──
+async function connect() {
+  const ak = document.getElementById('accessKey').value.trim();
+  const sk = document.getElementById('secretKey').value.trim();
+  const region = document.getElementById('region').value;
+  if (!ak||!sk) { toast('Enter credentials','err'); return; }
+  creds = { accessKey: ak, secretKey: sk, region };
+  setDot('');
+  try {
+    await ddb('ListTables', { Limit: 1 });
+    setDot('ok');
+    toast('Connected ✓','ok');
+    refreshTable();
+  } catch(e) {
+    creds = null; setDot('err');
+    toast(e.message.slice(0,60),'err');
+  }
+}
+
+// ── PLATFORM BADGE ──
+function platformBadge(p) {
+  const cls = { PC:'pc', PlayStation:'ps', Xbox:'xbox', Nintendo:'nintendo', Mobile:'mobile' }[p] || '';
+  return `<span class="badge ${cls}">${p||'—'}</span>`;
+}
+
+// ── RENDER TABLE ──
+function renderRows(items) {
+  const tbody = document.getElementById('tableBody');
+  if (!items.length) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><span class="icon">🎮</span>No games found — seed the table or insert one!</div></td></tr>';
+    document.getElementById('tableCount').textContent = '0 items';
+    return;
+  }
+  tbody.innerHTML = items.map(item => `
+    <tr id="row_${item.gameId}" class="${selectedIds.has(item.gameId)?'selected':''}">
+      <td><input type="checkbox" ${selectedIds.has(item.gameId)?'checked':''} onchange="toggleRow('${item.gameId}', this)"></td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${item.gameId}</td>
+      <td style="font-weight:500">${item.name||'—'}</td>
+      <td>${platformBadge(item.platform)}</td>
+      <td>${item.category||'—'}</td>
+      <td style="font-family:var(--mono);font-size:12px">${item.year||'—'}</td>
+    </tr>`).join('');
+  document.getElementById('tableCount').textContent = `${items.length} item${items.length!==1?'s':''}`;
+}
+
+// ── SELECT ──
+function toggleAll(cb) {
+  selectedIds.clear();
+  document.querySelectorAll('#tableBody input[type=checkbox]').forEach(c => {
+    c.checked = cb.checked;
+    const id = c.closest('tr')?.id?.replace('row_','');
+    if (cb.checked && id) selectedIds.add(id);
+    c.closest('tr')?.classList.toggle('selected', cb.checked);
+  });
+}
+function toggleRow(id, cb) {
+  if (cb.checked) selectedIds.add(id); else selectedIds.delete(id);
+  cb.closest('tr')?.classList.toggle('selected', cb.checked);
+}
+
+// ── REFRESH ──
+async function refreshTable() {
+  if (!creds) { toast('Connect first','err'); return; }
+  setMsg('loading…');
+  try {
+    const r = await ddb('Scan', { TableName: 'games' });
+    const items = r.Items.map(umItem);
+    items.sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+    renderRows(items);
+    setMsg('');
+  } catch(e) {
+    setMsg('');
+    if (e.message.includes('ResourceNotFoundException')) {
+      document.getElementById('tableBody').innerHTML = '<tr><td colspan="6"><div class="empty-state"><span class="icon">📭</span>Table does not exist yet — click Create Table</div></td></tr>';
+      document.getElementById('tableCount').textContent = '— items';
+    } else { toast(e.message.slice(0,60),'err'); }
+  }
+}
+
+function setMsg(msg) {
+  document.getElementById('tableMsg').textContent = msg;
+  document.getElementById('tableMsg').className = msg ? 'loading' : '';
+}
+
+// ── CREATE TABLE ──
+async function createTable() {
+  if (!creds) { toast('Connect first','err'); return; }
+  try {
+    await ddb('CreateTable', {
+      TableName: 'games',
+      AttributeDefinitions: [{ AttributeName: 'gameId', AttributeType: 'S' }],
+      KeySchema: [{ AttributeName: 'gameId', KeyType: 'HASH' }],
+      BillingMode: 'PAY_PER_REQUEST'
+    });
+    toast('Table "games" created ✓','ok');
+    setTimeout(refreshTable, 2000);
+  } catch(e) { toast(e.message.slice(0,60),'err'); }
+}
+
+// ── DELETE TABLE ──
+async function deleteTable() {
+  if (!creds) { toast('Connect first','err'); return; }
+  if (!confirm('Delete the "games" table? This cannot be undone.')) return;
+  try {
+    await ddb('DeleteTable', { TableName: 'games' });
+    toast('Table deleted','err');
+    selectedIds.clear();
+    renderRows([]);
+  } catch(e) { toast(e.message.slice(0,60),'err'); }
+}
+
+// ── SEED ──
+const SEEDS = [
+  { name:'The Legend of Zelda: Breath of the Wild', platform:'Nintendo', category:'Adventure', year:2017 },
+  { name:'Red Dead Redemption 2', platform:'PC', category:'Action', year:2018 },
+  { name:'God of War', platform:'PlayStation', category:'Action', year:2018 },
+  { name:'Halo Infinite', platform:'Xbox', category:'Shooter', year:2021 },
+  { name:'Elden Ring', platform:'PC', category:'RPG', year:2022 },
+  { name:'Stardew Valley', platform:'PC', category:'Simulation', year:2016 },
+  { name:'Among Us', platform:'Mobile', category:'Strategy', year:2018 },
+  { name:'The Witcher 3', platform:'PC', category:'RPG', year:2015 },
+  { name:'Minecraft', platform:'PC', category:'Simulation', year:2011 },
+  { name:'Hollow Knight', platform:'Nintendo', category:'Action', year:2017 },
+  { name:'FIFA 24', platform:'PlayStation', category:'Sports', year:2023 },
+  { name:'Forza Horizon 5', platform:'Xbox', category:'Racing', year:2021 },
+];
+
+async function seedTable() {
+  if (!creds) { toast('Connect first','err'); return; }
+  setMsg('seeding…');
+  let ok = 0;
+  for (const g of SEEDS) {
+    const id = 'game_' + Math.random().toString(36).slice(2,10);
+    try {
+      await ddb('PutItem', { TableName: 'games', Item: { gameId:{S:id}, name:{S:g.name}, platform:{S:g.platform}, category:{S:g.category}, year:{N:String(g.year)} } });
+      ok++;
+    } catch(e) {}
+  }
+  setMsg('');
+  toast(`Seeded ${ok} games ✓`,'ok');
+  refreshTable();
+}
+
+// ── DELETE SELECTED ──
+async function deleteSelected() {
+  if (!creds) { toast('Connect first','err'); return; }
+  if (!selectedIds.size) { toast('Select at least one game','err'); return; }
+  if (!confirm(`Delete ${selectedIds.size} selected game(s)?`)) return;
+  let ok = 0;
+  for (const id of selectedIds) {
+    try {
+      await ddb('DeleteItem', { TableName: 'games', Key: { gameId: { S: id } } });
+      ok++;
+    } catch(e) {}
+  }
+  selectedIds.clear();
+  document.getElementById('selectAll').checked = false;
+  toast(`Deleted ${ok} game(s)`,'err');
+  refreshTable();
+}
+
+// ── INSERT GAME ──
+async function insertGame() {
+  if (!creds) { toast('Connect first','err'); return; }
+  const name = document.getElementById('gameName').value.trim();
+  const platform = document.getElementById('platform').value;
+  const category = document.getElementById('category').value;
+  const year = document.getElementById('year').value;
+  if (!name||!platform||!category||!year) { toast('Fill in all fields','err'); return; }
+  const id = 'game_' + Math.random().toString(36).slice(2,10);
+  try {
+    await ddb('PutItem', { TableName: 'games', Item: { gameId:{S:id}, name:{S:name}, platform:{S:platform}, category:{S:category}, year:{N:year} } });
+    toast(`"${name}" added ✓`,'ok');
+    document.getElementById('gameName').value = '';
+    document.getElementById('platform').selectedIndex = 0;
+    document.getElementById('category').selectedIndex = 0;
+    document.getElementById('year').selectedIndex = 0;
+    refreshTable();
+  } catch(e) { toast(e.message.slice(0,60),'err'); }
+}
+</script>
+</body>
+</html>
