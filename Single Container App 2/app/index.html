@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mission Control — AWS Container Lab</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap');
+
+    :root {
+      --bg: #020b14;
+      --surface: #041525;
+      --border: #0d4f7a;
+      --accent: #00d4ff;
+      --accent2: #ff6b35;
+      --accent3: #39ff14;
+      --text: #c8e8f8;
+      --muted: #4a7a9b;
+      --danger: #ff3b5c;
+      --warn: #ffd700;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Exo 2', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+      background-image:
+        radial-gradient(ellipse at 20% 50%, rgba(0,100,180,0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(0,212,255,0.05) 0%, transparent 40%);
+    }
+
+    /* Animated starfield */
+    .stars {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background-image:
+        radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.6) 0%, transparent 100%),
+        radial-gradient(1px 1px at 30% 80%, rgba(255,255,255,0.4) 0%, transparent 100%),
+        radial-gradient(1px 1px at 50% 40%, rgba(255,255,255,0.7) 0%, transparent 100%),
+        radial-gradient(1px 1px at 70% 60%, rgba(255,255,255,0.3) 0%, transparent 100%),
+        radial-gradient(1px 1px at 90% 10%, rgba(255,255,255,0.5) 0%, transparent 100%),
+        radial-gradient(1px 1px at 15% 70%, rgba(255,255,255,0.4) 0%, transparent 100%),
+        radial-gradient(1px 1px at 85% 85%, rgba(255,255,255,0.6) 0%, transparent 100%),
+        radial-gradient(1px 1px at 45% 15%, rgba(255,255,255,0.3) 0%, transparent 100%),
+        radial-gradient(1px 1px at 65% 35%, rgba(255,255,255,0.5) 0%, transparent 100%),
+        radial-gradient(1px 1px at 25% 55%, rgba(255,255,255,0.4) 0%, transparent 100%);
+    }
+
+    .scanline {
+      position: fixed; inset: 0; pointer-events: none; z-index: 1;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,212,255,0.01) 2px, rgba(0,212,255,0.01) 4px);
+    }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 2; }
+
+    /* HEADER */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 16px 0;
+      background: rgba(2,11,20,0.9);
+      backdrop-filter: blur(12px);
+      position: sticky; top: 0; z-index: 100;
+    }
+
+    .header-inner {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    .logo {
+      display: flex; align-items: center; gap: 12px;
+    }
+
+    .logo-icon {
+      width: 40px; height: 40px;
+      background: linear-gradient(135deg, var(--accent), #0066aa);
+      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      animation: pulse-glow 3s ease-in-out infinite;
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 10px var(--accent); }
+      50% { box-shadow: 0 0 25px var(--accent), 0 0 50px rgba(0,212,255,0.3); }
+    }
+
+    .logo-text h1 {
+      font-family: 'Orbitron', monospace;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 3px;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+
+    .logo-text p {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 2px;
+    }
+
+    .status-bar {
+      display: flex; gap: 24px; align-items: center;
+    }
+
+    .status-item {
+      display: flex; align-items: center; gap: 6px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      animation: blink 2s ease-in-out infinite;
+    }
+    .dot.green { background: var(--accent3); box-shadow: 0 0 6px var(--accent3); }
+    .dot.blue { background: var(--accent); box-shadow: 0 0 6px var(--accent); animation-delay: 0.5s; }
+    .dot.orange { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); animation-delay: 1s; }
+
+    @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+    /* ENV BADGE */
+    .env-badge {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      padding: 4px 12px;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      letter-spacing: 2px;
+    }
+
+    /* MAIN GRID */
+    main { padding: 32px 0; }
+
+    .mission-title {
+      text-align: center;
+      margin-bottom: 40px;
+      animation: fade-in 1s ease-out;
+    }
+
+    @keyframes fade-in { from { opacity:0; transform:translateY(-20px); } to { opacity:1; transform:translateY(0); } }
+
+    .mission-title h2 {
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(28px, 5vw, 52px);
+      font-weight: 900;
+      letter-spacing: 4px;
+      background: linear-gradient(135deg, var(--accent) 0%, #ffffff 50%, var(--accent2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.1;
+    }
+
+    .mission-title p {
+      font-family: 'Share Tech Mono', monospace;
+      color: var(--muted);
+      font-size: 13px;
+      letter-spacing: 3px;
+      margin-top: 8px;
+    }
+
+    /* GRID */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: auto;
+      gap: 16px;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      animation: slide-in 0.6s ease-out both;
+    }
+
+    @keyframes slide-in { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+
+    .panel::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    }
+
+    .panel.accent2::before { background: linear-gradient(90deg, transparent, var(--accent2), transparent); }
+    .panel.accent3::before { background: linear-gradient(90deg, transparent, var(--accent3), transparent); }
+    .panel.warn::before { background: linear-gradient(90deg, transparent, var(--warn), transparent); }
+
+    .panel-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+
+    .panel-label span { color: var(--accent); }
+
+    .panel.span-2 { grid-column: span 2; }
+    .panel.span-3 { grid-column: span 3; }
+
+    /* SYS INFO */
+    .sys-value {
+      font-family: 'Orbitron', monospace;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    .sys-value.orange { color: var(--accent2); }
+    .sys-value.green { color: var(--accent3); }
+
+    .sys-sub {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* TELEMETRY BARS */
+    .telem-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .telem-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      width: 60px;
+      flex-shrink: 0;
+    }
+
+    .telem-bar {
+      flex: 1;
+      height: 6px;
+      background: rgba(13,79,122,0.4);
+      overflow: hidden;
+    }
+
+    .telem-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #00a8d4);
+      animation: fill-bar 2s ease-out both;
+      transform-origin: left;
+    }
+
+    .telem-fill.orange { background: linear-gradient(90deg, var(--accent2), #ff9900); }
+    .telem-fill.green { background: linear-gradient(90deg, var(--accent3), #00cc00); }
+
+    @keyframes fill-bar { from { width: 0 !important; } }
+
+    .telem-val {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--text);
+      width: 32px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* LOG PANEL */
+    .log-feed {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      line-height: 1.8;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .log-feed::-webkit-scrollbar { width: 4px; }
+    .log-feed::-webkit-scrollbar-track { background: var(--bg); }
+    .log-feed::-webkit-scrollbar-thumb { background: var(--border); }
+
+    .log-line { display: flex; gap: 10px; }
+    .log-time { color: var(--muted); flex-shrink: 0; }
+    .log-level { flex-shrink: 0; }
+    .log-level.info { color: var(--accent); }
+    .log-level.warn { color: var(--warn); }
+    .log-level.ok { color: var(--accent3); }
+    .log-level.err { color: var(--danger); }
+    .log-msg { color: var(--text); }
+
+    /* ORBIT VISUAL */
+    .orbit-container {
+      display: flex; align-items: center; justify-content: center;
+      height: 160px;
+      position: relative;
+    }
+
+    .planet {
+      width: 50px; height: 50px;
+      background: radial-gradient(circle at 35% 35%, #1a6fa8, #020b14);
+      border-radius: 50%;
+      box-shadow: 0 0 20px rgba(0,150,255,0.4), inset 0 0 15px rgba(0,0,0,0.5);
+      position: relative; z-index: 2;
+      animation: planet-rotate 20s linear infinite;
+    }
+
+    @keyframes planet-rotate {
+      from { box-shadow: 0 0 20px rgba(0,150,255,0.4), inset 0 0 15px rgba(0,0,0,0.5); }
+      50% { box-shadow: 0 0 35px rgba(0,212,255,0.6), inset 0 0 15px rgba(0,0,0,0.5); }
+      to { box-shadow: 0 0 20px rgba(0,150,255,0.4), inset 0 0 15px rgba(0,0,0,0.5); }
+    }
+
+    .orbit-ring {
+      position: absolute;
+      border: 1px solid rgba(0,212,255,0.2);
+      border-radius: 50%;
+    }
+
+    .satellite {
+      position: absolute;
+      width: 10px; height: 10px;
+      background: var(--accent);
+      clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+      transform-origin: center;
+    }
+
+    .orbit1 { width: 110px; height: 110px; animation: spin 4s linear infinite; }
+    .orbit2 { width: 150px; height: 150px; animation: spin 8s linear infinite reverse; }
+
+    .orbit1 .satellite { top: -5px; left: calc(50% - 5px); }
+    .orbit2 .satellite { top: -5px; left: calc(50% - 5px); background: var(--accent2); }
+
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    /* NODE STATUS */
+    .node-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    }
+
+    .node-card {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      padding: 10px 8px;
+      text-align: center;
+    }
+
+    .node-card.active { border-color: var(--accent3); }
+    .node-card.standby { border-color: var(--warn); }
+
+    .node-id {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    .node-status {
+      font-family: 'Orbitron', monospace;
+      font-size: 9px;
+      font-weight: 700;
+    }
+
+    .node-status.active { color: var(--accent3); }
+    .node-status.standby { color: var(--warn); }
+
+    /* ENV INFO TABLE */
+    .env-table { width: 100%; border-collapse: collapse; }
+    .env-table td {
+      padding: 8px 0;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      border-bottom: 1px solid rgba(13,79,122,0.3);
+    }
+    .env-table td:first-child { color: var(--muted); width: 40%; }
+    .env-table td:last-child { color: var(--accent); }
+
+    /* BOTTOM BAR */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 16px 0;
+      margin-top: 24px;
+    }
+
+    .footer-inner {
+      display: flex; justify-content: space-between; align-items: center;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .footer-inner a { color: var(--accent); text-decoration: none; }
+
+    /* TICKER */
+    .ticker {
+      overflow: hidden;
+      border: 1px solid var(--border);
+      padding: 6px 0;
+      margin-bottom: 24px;
+      background: rgba(0,0,0,0.3);
+    }
+
+    .ticker-inner {
+      display: flex;
+      white-space: nowrap;
+      animation: ticker 30s linear infinite;
+    }
+
+    @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+    .ticker-item {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      padding: 0 40px;
+    }
+
+    .ticker-item span { color: var(--accent); }
+
+    /* RESPONSIVE */
+    @media (max-width: 900px) {
+      .dashboard-grid { grid-template-columns: 1fr 1fr; }
+      .panel.span-3 { grid-column: span 2; }
+      .status-bar { display: none; }
+    }
+
+    @media (max-width: 600px) {
+      .dashboard-grid { grid-template-columns: 1fr; }
+      .panel.span-2, .panel.span-3 { grid-column: span 1; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="stars"></div>
+<div class="scanline"></div>
+
+<header>
+  <div class="container">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">🛰</div>
+        <div class="logo-text">
+          <h1>Mission Control</h1>
+          <p>AWS Container Lab // v1.0.0</p>
+        </div>
+      </div>
+      <div class="status-bar">
+        <div class="status-item"><div class="dot green"></div> CONTAINER HEALTHY</div>
+        <div class="status-item"><div class="dot blue"></div> NETWORK ONLINE</div>
+        <div class="status-item"><div class="dot orange"></div> TELEMETRY ACTIVE</div>
+      </div>
+      <div class="env-badge" id="env-badge">DETECTING ENV...</div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="container">
+
+    <div class="mission-title">
+      <h2>ORBITAL MISSION CONTROL</h2>
+      <p>SINGLE CONTAINER // MULTI-PLATFORM DEPLOYMENT LAB</p>
+    </div>
+
+    <div class="ticker">
+      <div class="ticker-inner" id="ticker">
+        <span class="ticker-item">SYS // CONTAINER RUNTIME ACTIVE <span>✓</span></span>
+        <span class="ticker-item">NET // INBOUND TRAFFIC NOMINAL <span>✓</span></span>
+        <span class="ticker-item">AWS // METADATA SERVICE REACHABLE <span>✓</span></span>
+        <span class="ticker-item">OPS // HEALTH CHECK PASSING <span>✓</span></span>
+        <span class="ticker-item">LAB // STUDENTS ONLINE <span>✓</span></span>
+        <span class="ticker-item">MEM // WITHIN LIMITS <span>✓</span></span>
+        <span class="ticker-item">CPU // NOMINAL LOAD <span>✓</span></span>
+        <span class="ticker-item">DNS // RESOLVING <span>✓</span></span>
+        <!-- duplicate for seamless loop -->
+        <span class="ticker-item">SYS // CONTAINER RUNTIME ACTIVE <span>✓</span></span>
+        <span class="ticker-item">NET // INBOUND TRAFFIC NOMINAL <span>✓</span></span>
+        <span class="ticker-item">AWS // METADATA SERVICE REACHABLE <span>✓</span></span>
+        <span class="ticker-item">OPS // HEALTH CHECK PASSING <span>✓</span></span>
+        <span class="ticker-item">LAB // STUDENTS ONLINE <span>✓</span></span>
+        <span class="ticker-item">MEM // WITHIN LIMITS <span>✓</span></span>
+        <span class="ticker-item">CPU // NOMINAL LOAD <span>✓</span></span>
+        <span class="ticker-item">DNS // RESOLVING <span>✓</span></span>
+      </div>
+    </div>
+
+    <div class="dashboard-grid">
+
+      <!-- UPTIME -->
+      <div class="panel" style="animation-delay:0.1s">
+        <div class="panel-label">MISSION ELAPSED TIME <span>LIVE</span></div>
+        <div class="sys-value" id="uptime">00:00:00</div>
+        <div class="sys-sub">HH:MM:SS since container start</div>
+      </div>
+
+      <!-- REQUESTS -->
+      <div class="panel accent2" style="animation-delay:0.2s">
+        <div class="panel-label">TOTAL REQUESTS <span>CUMULATIVE</span></div>
+        <div class="sys-value orange" id="req-count">0</div>
+        <div class="sys-sub">HTTP requests served this session</div>
+      </div>
+
+      <!-- ENVIRONMENT -->
+      <div class="panel accent3" style="animation-delay:0.3s">
+        <div class="panel-label">PLATFORM DETECTED <span>AUTO</span></div>
+        <div class="sys-value green" id="platform-val">—</div>
+        <div class="sys-sub" id="platform-sub">Detecting orchestrator…</div>
+      </div>
+
+      <!-- TELEMETRY -->
+      <div class="panel span-2" style="animation-delay:0.4s">
+        <div class="panel-label">SYSTEM TELEMETRY <span>SIMULATED</span></div>
+        <div id="telem-bars"></div>
+      </div>
+
+      <!-- ORBIT -->
+      <div class="panel" style="animation-delay:0.5s; display:flex; flex-direction:column; align-items:center;">
+        <div class="panel-label" style="width:100%">ORBITAL STATUS <span>NOMINAL</span></div>
+        <div class="orbit-container">
+          <div class="orbit-ring orbit1"><div class="satellite"></div></div>
+          <div class="orbit-ring orbit2"><div class="satellite"></div></div>
+          <div class="planet"></div>
+        </div>
+      </div>
+
+      <!-- ENV TABLE -->
+      <div class="panel span-2" style="animation-delay:0.6s">
+        <div class="panel-label">ENVIRONMENT MANIFEST <span>RUNTIME</span></div>
+        <table class="env-table" id="env-table">
+          <tr><td>HOSTNAME</td><td id="env-hostname">—</td></tr>
+          <tr><td>PLATFORM</td><td id="env-platform">—</td></tr>
+          <tr><td>USER AGENT</td><td id="env-ua">—</td></tr>
+          <tr><td>TIMESTAMP</td><td id="env-ts">—</td></tr>
+          <tr><td>CONTAINER ID</td><td id="env-cid">—</td></tr>
+        </table>
+      </div>
+
+      <!-- NODE STATUS -->
+      <div class="panel" style="animation-delay:0.7s">
+        <div class="panel-label">POD / TASK NODES <span>STATUS</span></div>
+        <div class="node-grid" id="node-grid"></div>
+      </div>
+
+      <!-- LOG -->
+      <div class="panel span-3 accent3" style="animation-delay:0.8s">
+        <div class="panel-label">MISSION LOG <span id="log-count">0 ENTRIES</span></div>
+        <div class="log-feed" id="log-feed"></div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <span>AWS CONTAINER LAB // EKS & ECS CONSOLE TRAINING</span>
+      <span>IMAGE: <span style="color:var(--accent)">public.ecr.aws/aws-container-lab/mission-control:latest</span></span>
+      <span>PORT <span style="color:var(--accent)">80</span> // HEALTH <span style="color:var(--accent3)">PASS</span></span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // ── Uptime ──
+  const startTime = Date.now();
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function updateUptime() {
+    const s = Math.floor((Date.now() - startTime) / 1000);
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    document.getElementById('uptime').textContent = `${pad(h)}:${pad(m)}:${pad(sec)}`;
+  }
+  setInterval(updateUptime, 1000);
+
+  // ── Request counter ──
+  let reqCount = Math.floor(Math.random() * 200) + 50;
+  document.getElementById('req-count').textContent = reqCount;
+  setInterval(() => {
+    reqCount += Math.floor(Math.random() * 3);
+    document.getElementById('req-count').textContent = reqCount;
+  }, 3000);
+
+  // ── Platform detection ──
+  const ua = navigator.userAgent;
+  const hostname = location.hostname;
+  let platform = 'EKS', platformSub = '--';
+
+  document.getElementById('platform-val').textContent = platform;
+  document.getElementById('platform-sub').textContent = platformSub;
+  document.getElementById('env-badge').textContent = platform === 'LOCAL' ? 'LOCAL / DOCKER' : `RUNNING ON ${platform}`;
+
+  // ── Env manifest ──
+  const cid = Math.random().toString(16).substr(2, 12).toUpperCase();
+  document.getElementById('env-hostname').textContent = hostname || 'localhost';
+  document.getElementById('env-platform').textContent = platform;
+  document.getElementById('env-ua').textContent = ua.substr(0, 38) + '…';
+  document.getElementById('env-ts').textContent = new Date().toISOString();
+  document.getElementById('env-cid').textContent = cid;
+
+  // ── Telemetry bars ──
+  const telem = [
+    { label: 'CPU', pct: Math.floor(Math.random()*30)+10, cls:''},
+    { label: 'MEM', pct: Math.floor(Math.random()*40)+20, cls:'orange'},
+    { label: 'NET', pct: Math.floor(Math.random()*60)+15, cls:'green'},
+    { label: 'DISK', pct: Math.floor(Math.random()*20)+5, cls:''},
+  ];
+  const tb = document.getElementById('telem-bars');
+  telem.forEach(t => {
+    tb.innerHTML += `<div class="telem-row">
+      <div class="telem-label">${t.label}</div>
+      <div class="telem-bar"><div class="telem-fill ${t.cls}" style="width:${t.pct}%"></div></div>
+      <div class="telem-val">${t.pct}%</div>
+    </div>`;
+  });
+  setInterval(() => {
+    document.querySelectorAll('.telem-fill').forEach((el, i) => {
+      const v = Math.min(95, Math.max(5, parseInt(el.style.width) + (Math.random()*10-5)));
+      el.style.width = v + '%';
+      el.closest('.telem-row').querySelector('.telem-val').textContent = Math.round(v) + '%';
+    });
+  }, 2000);
+
+  // ── Node grid ──
+  const ng = document.getElementById('node-grid');
+  const nodeCount = platform === 'EKS' ? 4 : 3;
+  for (let i = 0; i < nodeCount; i++) {
+    const active = i < nodeCount - 1;
+    ng.innerHTML += `<div class="node-card ${active ? 'active' : 'standby'}">
+      <div class="node-id">${platform === 'EKS' ? 'POD' : 'TASK'}-${String(i+1).padStart(3,'0')}</div>
+      <div class="node-status ${active ? 'active' : 'standby'}">${active ? 'RUNNING' : 'STANDBY'}</div>
+    </div>`;
+  }
+
+  // ── Mission log ──
+  const logMessages = [
+    ['ok',   'Container started successfully'],
+    ['info', `Platform detected: ${platform}`],
+    ['ok',   'Health check endpoint /health responding 200'],
+    ['info', 'Waiting for inbound traffic on port 80'],
+    ['ok',   `Serving ${reqCount} requests this session`],
+    ['info', 'AWS metadata service reachable'],
+    ['ok',   'DNS resolution confirmed'],
+    ['info', 'Telemetry subsystem initialized'],
+    ['warn', 'No persistent storage mounted (expected for stateless lab)'],
+    ['ok',   'All systems nominal — mission control online'],
+  ];
+
+  const feed = document.getElementById('log-feed');
+  let logIdx = 0;
+  function addLog() {
+    if (logIdx >= logMessages.length) {
+      const liveLogs = [
+        ['info', `Processed request #${reqCount}`],
+        ['ok',   'Health check PASS'],
+        ['info', 'Heartbeat telemetry sent'],
+      ];
+      const l = liveLogs[Math.floor(Math.random()*liveLogs.length)];
+      const now = new Date().toTimeString().substr(0,8);
+      feed.innerHTML += `<div class="log-line"><span class="log-time">${now}</span><span class="log-level ${l[0]}">[${l[0].toUpperCase()}]</span><span class="log-msg">${l[1]}</span></div>`;
+      feed.scrollTop = feed.scrollHeight;
+      document.getElementById('log-count').textContent = `${feed.querySelectorAll('.log-line').length} ENTRIES`;
+      return;
+    }
+    const [level, msg] = logMessages[logIdx++];
+    const now = new Date().toTimeString().substr(0,8);
+    feed.innerHTML += `<div class="log-line"><span class="log-time">${now}</span><span class="log-level ${level}">[${level.toUpperCase()}]</span><span class="log-msg">${msg}</span></div>`;
+    feed.scrollTop = feed.scrollHeight;
+    document.getElementById('log-count').textContent = `${feed.querySelectorAll('.log-line').length} ENTRIES`;
+    setTimeout(addLog, 400);
+  }
+  setTimeout(addLog, 600);
+  setInterval(addLog, 5000);
+</script>
+
+</body>
+</html>
