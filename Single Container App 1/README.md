@@ -88,42 +88,42 @@ Now add an explicit inline policy so you can see the exact ECR permissions being
 1. Click into `mission-control-execution-role` → **Add permissions** → **Create inline policy** → **JSON** tab
 2. Paste the following:
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "ECRAuth",
-      "Effect": "Allow",
-      "Action": "ecr:GetAuthorizationToken",
-      "Resource": "*"
-    },
-    {
-      "Sid": "ECRPullImage",
-      "Effect": "Allow",
-      "Action": [
-        "ecr:BatchCheckLayerAvailability",
-        "ecr:GetDownloadUrlForLayer",
-        "ecr:BatchGetImage"
-      ],
-      "Resource": "arn:aws:ecr:<REGION>:<ACCOUNT_ID>:repository/mission-control"
-    },
-    {
-      "Sid": "CloudWatchLogs",
-      "Effect": "Allow",
-      "Action": [
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
-```
+      ```json
+      {
+         "Version": "2012-10-17",
+         "Statement": [
+            {
+               "Sid": "ECRAuth",
+               "Effect": "Allow",
+               "Action": "ecr:GetAuthorizationToken",
+               "Resource": "*"
+            },
+            {
+               "Sid": "ECRPullImage",
+               "Effect": "Allow",
+               "Action": [
+               "ecr:BatchCheckLayerAvailability",
+               "ecr:GetDownloadUrlForLayer",
+               "ecr:BatchGetImage"
+               ],
+               "Resource": "arn:aws:ecr:<REGION>:<ACCOUNT_ID>:repository/mission-control"
+            },
+            {
+               "Sid": "CloudWatchLogs",
+               "Effect": "Allow",
+               "Action": [
+               "logs:CreateLogGroup",
+               "logs:CreateLogStream",
+               "logs:PutLogEvents"
+               ],
+               "Resource": "*"
+            }
+         ]
+      }
+      ```
 
-1. Replace `<REGION>` and `<ACCOUNT_ID>` with your values
-2. **Policy name:** `mission-control-execution-policy` → **Create policy**
+3. Replace `<REGION>` and `<ACCOUNT_ID>` with your values
+4. **Policy name:** `mission-control-execution-policy` → **Create policy**
 
 > **Why `ecr:GetAuthorizationToken` uses `Resource: "*"`:** This is a global API call — it returns a Docker login token for your whole registry. There's no specific resource ARN to scope it to. The actual image pull actions (`BatchGetImage`, etc.) are scoped to your specific repository.
 
