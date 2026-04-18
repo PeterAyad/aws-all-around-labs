@@ -54,7 +54,7 @@ EKS needs specific tags on subnets so the Kubernetes Cloud Controller knows whic
 ### Build and push
 
 1. Click into `mission-control` → **View push commands**
-2. Follow the 4 commands shown in your terminal from the `shared/` folder
+2. Follow the 4 commands shown in your terminal
 3. Confirm the `latest` tag appears in the repository
 
 > The image is **private**. No node can pull it without the correct IAM permissions. This is exactly why the node role exists.
