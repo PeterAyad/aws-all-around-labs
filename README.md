@@ -35,14 +35,14 @@ Every completed lab in this repository is designed to be executed directly in th
 | 6   | **[Large Dataset Download](./Large%20Dataset%20Download/)**                         | EC2, EFS            | Mount EFS on EC2, download data, verify it's shared across instances.                | 🟢 Ready               |
 | 7   | **[DynamoDB Playground](./DynamoDB%20Playground/)**                                 | DynamoDB            | Create tables, seed data, and query — all from a browser UI.                         | 🟢 Ready               |
 | 8   | **[Stateless API](./Stateless%20API/)**                                             | API Gateway, Lambda | Wire up a REST API backed by a Lambda function.                                      | 🟢 Ready               |
-| 9   | **[Single Container App 1](./Single%20Container%20App%201/)**                       | ECS, Fargate        | Deploy and manage a containerized application using Elastic Container Service.       | 🚧 Under Construction  |
-| 10  | **[Single Container App 2](./Single%20Container%20App%202/)**                       | EKS                 | Deploy and manage a containerized application using Elastic Kubernetes Service.      | 🚧 Under Construction  |
-| 11  | **[Three-tier Application - Phase 1](./Three-tier%20Application%20-%20Phase%201/)** | VPC, RDS, EC2       | Spin up a full 3-tier app (DB + backend + frontend) across public & private subnets. | 🚧 Under Construction  |
+| 9   | **[Single Container App 1](./Single%20Container%20App%201/)**                       | ECS, Fargate        | Deploy and manage a containerized application using Elastic Container Service.       | 🟢 Ready               |
+| 10  | **[Single Container App 2](./Single%20Container%20App%202/)**                       | EKS                 | Deploy and manage a containerized application using Elastic Kubernetes Service.      | 🟢 Ready               |
+| 11  | **[Three-tier Application - Phase 1](./Three-tier%20Application%20-%20Phase%201/)** | VPC, RDS, EC2       | Spin up a full 3-tier app (DB + backend + frontend) across public & private subnets. | 🟢 Ready               |
 | 12  | **[Three-tier Application - Phase 2](./Three-tier%20Application%20-%20Phase%202/)** | ELB, Auto Scaling   | Add load balancing and high availability to the 3-tier architecture.                 | 🚧 Under Construction  |
-| 13  | **[EC2 Access Lab](./Service%20Access%20Labs/)**                                    | IAM, EC2            | Learn how EC2 instances securely access AWS resources via Instance Profiles.         | 🚧 Under Construction  |
-| 14  | **[Lambda Access Lab](./Service%20Access%20Labs/)**                                 | IAM, Lambda         | Understand Lambda Execution Roles and how credentials refresh dynamically.           | 🚧 Under Construction  |
-| 15  | **[ECS Access Lab](./Service%20Access%20Labs/)**                                    | IAM, ECS            | Learn the critical difference between ECS infrastructure roles and task-level roles. | 🚧 Under Construction  |
-| 16  | **[EKS Access Lab](./Service%20Access%20Labs/)**                                    | IAM, EKS            | Explore pod-scoped permissions (IRSA via OIDC) inside a Kubernetes cluster.          | 🚧 Under Construction  |
+| 13  | **[EC2 Access Lab](./Service%20Access%20Labs/)**                                    | IAM, EC2            | Learn how EC2 instances securely access AWS resources via Instance Profiles.         | 🟢 Ready               |
+| 14  | **[Lambda Access Lab](./Service%20Access%20Labs/)**                                 | IAM, Lambda         | Understand Lambda Execution Roles and how credentials refresh dynamically.           | 🟢 Ready               |
+| 15  | **[ECS Access Lab](./Service%20Access%20Labs/)**                                    | IAM, ECS            | Learn the critical difference between ECS infrastructure roles and task-level roles. | 🟢 Ready               |
+| 16  | **[EKS Access Lab](./Service%20Access%20Labs/)**                                    | IAM, EKS            | Explore pod-scoped permissions (IRSA via OIDC) inside a Kubernetes cluster.          | 🟢 Ready               |
 
 -----
 
