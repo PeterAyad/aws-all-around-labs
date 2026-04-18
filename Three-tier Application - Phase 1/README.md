@@ -109,6 +109,7 @@ Before running any scripts, complete these steps in the AWS Console:
 - Master username: `postgres`, set a password (for the lab use `postgres`)
 - For the authentication, select `Password authentication` for simplicity
 - VPC: `lab-vpc`, Subnet group: create one using `lab-private-subnet`
+- In additional configuration: Set initial database name as `postgres`
 - Use the default values for the rest of the settings and create the DB
 - After the db creation finishes, go to the DB configuration page > **Connectivity & Security**
 - Under **Security group rules** open the **Security group** with type `EC2 Security Group - Inbound`
