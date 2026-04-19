@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>AWS VPC Lab — Book Catalog</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Cabinet+Grotesk:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:      #07090f;
+      --panel:   #0c1018;
+      --panel2:  #101520;
+      --border:  #1a2335;
+      --accent:  #00d4ff;
+      --green:   #00e5a0;
+      --red:     #ff4757;
+      --yellow:  #ffd32a;
+      --purple:  #a855f7;
+      --orange:  #ff6b35;
+      --text:    #dde4f0;
+      --muted:   #45607a;
+      --r:       6px;
+      --mono:    'JetBrains Mono', monospace;
+      --sans:    'Cabinet Grotesk', sans-serif;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh}
+    body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+      background-image:linear-gradient(rgba(0,212,255,.02) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(0,212,255,.02) 1px,transparent 1px);
+      background-size:48px 48px}
+    .app{position:relative;z-index:1;display:grid;grid-template-rows:auto auto 1fr;min-height:100vh}
+
+    /* Header */
+    header{background:rgba(12,16,24,.96);border-bottom:1px solid var(--border);
+      backdrop-filter:blur(12px);padding:0 1.5rem;height:54px;
+      display:flex;align-items:center;justify-content:space-between;
+      position:sticky;top:0;z-index:100}
+    .logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+    .logo-mark{width:28px;height:28px;border-radius:5px;
+      background:linear-gradient(135deg,var(--accent),var(--purple));
+      display:flex;align-items:center;justify-content:center;font-size:13px}
+    .logo-text{font-family:var(--mono);font-size:.78rem;font-weight:700;letter-spacing:.04em}
+    .logo-text span{color:var(--accent)}
+    .hbadges{display:flex;gap:6px;flex-wrap:wrap}
+    .hb{font-family:var(--mono);font-size:.63rem;font-weight:500;
+      padding:3px 8px;border-radius:999px;border:1px solid;letter-spacing:.04em}
+    .hb-blue  {border-color:rgba(0,212,255,.3); color:var(--accent);background:rgba(0,212,255,.06)}
+    .hb-green {border-color:rgba(0,229,160,.3); color:var(--green); background:rgba(0,229,160,.06)}
+    .hb-red   {border-color:rgba(255,71,87,.3); color:var(--red);   background:rgba(255,71,87,.06)}
+    .hb-warn  {border-color:rgba(255,211,42,.3);color:var(--yellow);background:rgba(255,211,42,.06)}
+    .hb-muted {border-color:var(--border);color:var(--muted)}
+
+    /* Tabs */
+    .tabs{background:var(--panel);border-bottom:1px solid var(--border);display:flex;padding:0 1.5rem}
+    .tab{font-family:var(--mono);font-size:.74rem;font-weight:500;
+      padding:0 16px;height:41px;display:flex;align-items:center;gap:6px;
+      color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;
+      transition:all .15s;user-select:none}
+    .tab:hover{color:var(--text)} .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+    .ldot{width:6px;height:6px;border-radius:50%;background:var(--green);
+      box-shadow:0 0 5px var(--green);animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+    .panel{display:none} .panel.active{display:block}
+    .main{max-width:1200px;margin:0 auto;padding:1.5rem 1.5rem 3rem}
+
+    /* Alerts */
+    .alert{display:none;padding:10px 15px;border-radius:var(--r);margin-bottom:1.1rem;
+      font-family:var(--mono);font-size:.74rem;line-height:1.6;border-left:3px solid;
+      align-items:flex-start;gap:7px}
+    .alert.show{display:flex}
+    .a-error{background:rgba(255,71,87,.06);border-color:var(--red);color:var(--red)}
+    .a-warn {background:rgba(255,211,42,.06);border-color:var(--yellow);color:var(--yellow)}
+
+    /* Stats strip */
+    .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:9px;margin-bottom:1.2rem}
+    .stat{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:11px 13px}
+    .stat-lbl{font-family:var(--mono);font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+    .stat-val{font-family:var(--mono);font-size:1.25rem;font-weight:700;line-height:1}
+    .stat-sub{font-family:var(--mono);font-size:.62rem;color:var(--muted);margin-top:2px}
+
+    /* Instance cards */
+    .sec-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+    .sec-lbl{font-family:var(--mono);font-size:.66rem;font-weight:700;
+      letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
+      display:flex;align-items:center;gap:7px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:9px;margin-bottom:1.2rem}
+    .icard{background:var(--panel);border:1px solid var(--border);border-radius:9px;
+      padding:13px;position:relative;overflow:hidden;transition:border-color .3s}
+    .icard.healthy    {border-color:rgba(0,229,160,.25)}
+    .icard.unhealthy  {border-color:rgba(255,71,87,.35)}
+    .icard.new        {border-color:rgba(0,212,255,.3)}
+    .icard.flash{animation:flash .7s ease}
+    @keyframes flash{0%,100%{background:var(--panel)}40%{background:rgba(0,212,255,.07);border-color:rgba(0,212,255,.5)}}
+    .iglow{position:absolute;top:0;right:0;width:60px;height:60px;border-radius:50%;
+      opacity:.05;pointer-events:none;transform:translate(30%,-30%)}
+    .icard-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+    .icard-id{font-family:var(--mono);font-size:.73rem;font-weight:700}
+    .cdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+    .dg{background:var(--green);box-shadow:0 0 5px var(--green)}
+    .dr{background:var(--red);box-shadow:0 0 5px var(--red)}
+    .dy{background:var(--yellow)} .db{background:var(--accent);animation:pulse 1.5s infinite}
+    .istats{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+    .il{font-family:var(--mono);font-size:.59rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+    .iv{font-family:var(--mono);font-size:.76rem;font-weight:500;margin-top:1px}
+    .cg{color:var(--green)} .cr{color:var(--red)} .ca{color:var(--accent)} .cm{color:var(--muted);font-size:.67rem!important}
+    .hitbar{margin-top:8px}
+    .hitbar-lbl{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-bottom:3px}
+    .hitbar-t{height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+    .hitbar-f{height:100%;border-radius:2px;transition:width .9s ease}
+    .grid-empty{grid-column:1/-1;text-align:center;padding:2rem;font-family:var(--mono);font-size:.78rem;color:var(--muted)}
+
+    /* Distribution */
+    .dist{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:13px;margin-bottom:1.2rem}
+    .dist-ttl{font-family:var(--mono);font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:9px}
+    .dist-bars{display:flex;flex-direction:column;gap:6px}
+    .dist-row{display:grid;grid-template-columns:130px 1fr 50px;gap:7px;align-items:center}
+    .dist-lbl{font-family:var(--mono);font-size:.7rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .dist-t{height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+    .dist-f{height:100%;border-radius:3px;transition:width 1s ease}
+    .dist-n{font-family:var(--mono);font-size:.66rem;color:var(--muted);text-align:right}
+
+    /* Feed */
+    .feed-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
+    .feed-ttl{font-family:var(--mono);font-size:.65rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:7px}
+    .feed-ctrls{display:flex;gap:6px}
+    .feed-wrap{background:var(--panel);border:1px solid var(--border);border-radius:9px;height:280px;overflow:hidden}
+    .feed-inner{height:100%;overflow-y:auto;font-family:var(--mono);font-size:.7rem}
+    .feed-inner::-webkit-scrollbar{width:3px} .feed-inner::-webkit-scrollbar-thumb{background:var(--border)}
+    .frow{display:grid;grid-template-columns:72px 130px 48px 52px 1fr;gap:0;
+      padding:5px 13px;border-bottom:1px solid rgba(26,35,53,.6);align-items:center;
+      animation:rin .25s ease}
+    @keyframes rin{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:none}}
+    .frow:hover{background:rgba(0,212,255,.02)}
+    .ft{color:var(--muted);font-size:.63rem} .fi{font-weight:700;font-size:.68rem;overflow:hidden;text-overflow:ellipsis}
+    .fs{font-size:.66rem;font-weight:600} .fl{color:var(--muted);font-size:.65rem}
+    .fr{color:var(--muted);font-size:.63rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .s2{color:var(--green)} .s4{color:var(--yellow)} .s5{color:var(--red)}
+    .feed-empty{display:flex;align-items:center;justify-content:center;height:100%;
+      color:var(--muted);font-size:.76rem;flex-direction:column;gap:6px;text-align:center}
+
+    /* Buttons */
+    .btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:var(--r);
+      font-family:var(--sans);font-weight:700;font-size:.78rem;border:none;cursor:pointer;transition:all .15s}
+    .btn-p{background:var(--accent);color:#000} .btn-p:hover{filter:brightness(1.1);transform:translateY(-1px)}
+    .btn-p:disabled{opacity:.35;cursor:not-allowed;transform:none;filter:none}
+    .btn-g{background:transparent;color:var(--muted);border:1px solid var(--border)}
+    .btn-g:hover{border-color:var(--accent);color:var(--accent)}
+    .btn-d{background:rgba(255,71,87,.1);color:var(--red);border:1px solid rgba(255,71,87,.2)}
+    .btn-d:hover{background:rgba(255,71,87,.18)}
+    .btn-sm{padding:4px 9px;font-size:.72rem} .btn-icon{padding:5px;border-radius:4px}
+
+    /* Catalog */
+    .ptitle{font-family:var(--sans);font-weight:900;font-size:1.45rem;letter-spacing:-.03em}
+    .psub{font-family:var(--mono);font-size:.68rem;color:var(--muted);margin-top:4px}
+    .toolbar{display:flex;align-items:center;gap:7px;margin-bottom:1rem;flex-wrap:wrap}
+    .sw{position:relative;flex:1;min-width:170px}
+    .sw input{width:100%;background:var(--panel);border:1px solid var(--border);border-radius:var(--r);
+      color:var(--text);font-family:var(--mono);font-size:.78rem;padding:8px 11px 8px 32px;outline:none;transition:border-color .2s}
+    .sw input:focus{border-color:var(--accent)}
+    .si{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:12px;pointer-events:none}
+    select{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);
+      color:var(--text);font-family:var(--mono);font-size:.74rem;padding:8px 11px;outline:none;cursor:pointer}
+    select:focus{border-color:var(--accent)}
+    .tw{background:var(--panel);border:1px solid var(--border);border-radius:9px;overflow:hidden}
+    table{width:100%;border-collapse:collapse}
+    thead tr{background:var(--panel2);border-bottom:1px solid var(--border)}
+    th{font-family:var(--mono);font-size:.6rem;font-weight:700;letter-spacing:.07em;
+      text-transform:uppercase;color:var(--muted);padding:9px 13px;text-align:left}
+    td{padding:10px 13px;border-bottom:1px solid rgba(26,35,53,.7);font-size:.85rem;vertical-align:middle}
+    tbody tr:last-child td{border-bottom:none} tbody tr:hover{background:rgba(0,212,255,.015)}
+    .tit{font-weight:600} .tau{color:var(--muted);font-style:italic}
+    .tge{display:inline-block;padding:2px 7px;border-radius:999px;font-family:var(--mono);font-size:.63rem;
+      background:rgba(168,85,247,.1);color:var(--purple);border:1px solid rgba(168,85,247,.2)}
+    .tyr{font-family:var(--mono);font-size:.74rem;color:var(--muted)}
+    .stars{color:var(--yellow);font-size:.76rem;letter-spacing:-2px}
+    .tsv{font-family:var(--mono);font-size:.65rem;font-weight:700;padding:2px 6px;border-radius:4px}
+    .tac{display:flex;gap:4px}
+    .empty-st{text-align:center;padding:2.5rem;color:var(--muted);font-family:var(--mono);font-size:.78rem}
+
+    /* Modal */
+    .ov{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;
+      justify-content:center;z-index:300;backdrop-filter:blur(4px)}
+    .ov.open{display:flex}
+    .modal{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+      width:100%;max-width:480px;max-height:90vh;overflow-y:auto;padding:1.6rem;
+      animation:min .2s ease}
+    @keyframes min{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
+    .mhdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.1rem}
+    .mttl{font-family:var(--sans);font-weight:900;font-size:1rem}
+    .mclose{background:none;border:none;color:var(--muted);font-size:1.1rem;cursor:pointer;padding:4px 7px;border-radius:4px}
+    .mclose:hover{color:var(--text)}
+    .fg{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .ff{grid-column:1/-1}
+    .field{display:flex;flex-direction:column;gap:4px}
+    label{font-family:var(--mono);font-size:.61rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+    input[type=text],input[type=number],textarea{background:var(--bg);border:1px solid var(--border);
+      border-radius:var(--r);color:var(--text);font-family:var(--mono);font-size:.82rem;
+      padding:8px 10px;outline:none;transition:border-color .2s;width:100%}
+    input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+    textarea{resize:vertical;min-height:65px}
+    .mact{display:flex;gap:7px;justify-content:flex-end;margin-top:1.1rem}
+    .cm{background:var(--panel);border:1px solid var(--border);border-radius:9px;
+      width:100%;max-width:310px;padding:1.4rem;animation:min .2s}
+    .cmttl{font-family:var(--sans);font-weight:900;font-size:.95rem;margin-bottom:.4rem}
+    .cmbod{color:var(--muted);font-size:.82rem;margin-bottom:1.1rem;line-height:1.6}
+    .cmact{display:flex;gap:7px;justify-content:flex-end}
+
+    /* Toast */
+    .tws{position:fixed;bottom:1.5rem;right:1.5rem;display:flex;flex-direction:column;gap:5px;z-index:400}
+    .toast{padding:9px 14px;border-radius:6px;font-family:var(--mono);font-size:.71rem;
+      display:flex;align-items:center;gap:6px;animation:tin .2s;border:1px solid;max-width:290px}
+    @keyframes tin{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+    .tok  {background:rgba(0,229,160,.08);border-color:rgba(0,229,160,.25);color:var(--green)}
+    .terr {background:rgba(255,71,87,.08); border-color:rgba(255,71,87,.25); color:var(--red)}
+    .tinf {background:rgba(0,212,255,.08); border-color:rgba(0,212,255,.25); color:var(--accent)}
+    .ld{display:inline-block;width:11px;height:11px;border:2px solid var(--border);
+      border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <a class="logo" href="#">
+      <div class="logo-mark">⚖️</div>
+      <div class="logo-text">vpc<span>-lab</span>/phase-2</div>
+    </a>
+    <div class="hbadges">
+      <span class="hb hb-blue"  id="hbAlb">ALB: checking…</span>
+      <span class="hb hb-muted" id="hbInst">discovering…</span>
+      <span class="hb hb-green" id="hbH" style="display:none"></span>
+      <span class="hb hb-muted" id="hbRq" style="display:none"></span>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" onclick="sw('asg')" id="tab-asg"><div class="ldot"></div> ASG Dashboard</div>
+    <div class="tab" onclick="sw('cat')" id="tab-cat">📚 Book Catalog</div>
+  </div>
+
+  <!-- ASG Dashboard -->
+  <div class="panel active" id="panel-asg">
+    <div class="main">
+      <div class="alert a-error" id="aerr"><span>🔴</span><span id="aerrm"></span></div>
+      <div class="alert a-warn"  id="awrn"><span>⚠️</span><span id="awrnm"></span></div>
+
+      <div class="stats">
+        <div class="stat"><div class="stat-lbl">Instances</div><div class="stat-val" id="sInst" style="color:var(--accent)">—</div><div class="stat-sub">in target group</div></div>
+        <div class="stat"><div class="stat-lbl">Healthy</div><div class="stat-val" id="sHlth" style="color:var(--green)">—</div><div class="stat-sub">passing health checks</div></div>
+        <div class="stat"><div class="stat-lbl">Requests</div><div class="stat-val" id="sReqs" style="color:var(--text)">—</div><div class="stat-sub">served total</div></div>
+        <div class="stat"><div class="stat-lbl">Avg Latency</div><div class="stat-val" id="sLat" style="color:var(--yellow)">—</div><div class="stat-sub">to backend nodes</div></div>
+      </div>
+
+      <div class="sec-hdr">
+        <div class="sec-lbl"><div class="ldot"></div> Backend Instances</div>
+        <div style="font-family:var(--mono);font-size:.64rem;color:var(--muted)" id="lpoll">Polling every 5s</div>
+      </div>
+      <div class="grid" id="igrid">
+        <div class="grid-empty"><span class="ld"></span> &nbsp;Discovering instances via ALB…</div>
+      </div>
+
+      <div class="dist">
+        <div class="dist-ttl">Request Distribution</div>
+        <div class="dist-bars" id="dbars"><div style="font-family:var(--mono);font-size:.7rem;color:var(--muted)">Waiting for traffic…</div></div>
+      </div>
+
+      <div>
+        <div class="feed-hdr">
+          <div class="feed-ttl"><div class="ldot"></div> Live Request Feed <span id="fcnt" style="font-weight:400;font-size:.6rem">(0)</span></div>
+          <div class="feed-ctrls">
+            <button class="btn btn-g btn-sm" onclick="tpause()" id="pbtn">⏸ Pause</button>
+            <button class="btn btn-g btn-sm" onclick="clrfeed()">🗑 Clear</button>
+            <button class="btn btn-g btn-sm" onclick="genload()" id="glbtn">⚡ Generate load</button>
+          </div>
+        </div>
+        <div class="feed-wrap">
+          <div class="feed-inner" id="fi">
+            <div class="feed-empty"><div style="font-size:1.4rem">📡</div>Waiting for requests…<span style="font-size:.66rem">Use Book Catalog or click ⚡ Generate load</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Book Catalog -->
+  <div class="panel" id="panel-cat">
+    <div class="main">
+      <div class="alert a-error" id="aerr2"><span>🔴</span><span id="aerrm2"></span></div>
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+        <div><div class="ptitle">Book Catalog</div><div class="psub" id="bcnt">Loading…</div></div>
+        <button class="btn btn-p" id="addbtn" onclick="openAdd()" disabled>＋ Add Book</button>
+      </div>
+      <div class="toolbar">
+        <div class="sw"><span class="si">🔍</span><input type="text" id="srch" placeholder="Search title or author…" oninput="filterBooks()"/></div>
+        <select id="gfilt" onchange="filterBooks()"><option value="">All genres</option></select>
+      </div>
+      <div class="tw">
+        <table>
+          <thead><tr>
+            <th>Title</th><th>Author</th><th>Year</th><th>Genre</th>
+            <th>Rating</th><th>Served by</th><th style="width:82px">Actions</th>
+          </tr></thead>
+          <tbody id="btable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="ov" id="bmod">
+  <div class="modal">
+    <div class="mhdr"><div class="mttl" id="mttl">Add Book</div><button class="mclose" onclick="closeMod()">✕</button></div>
+    <div class="fg">
+      <div class="field ff"><label>Title *</label><input type="text" id="ft"/></div>
+      <div class="field"><label>Author *</label><input type="text" id="fa"/></div>
+      <div class="field"><label>Year</label><input type="number" id="fy" min="1000" max="2099"/></div>
+      <div class="field">
+        <label>Genre</label>
+        <select id="fg" style="background:var(--bg)"><option value="">Select…</option>
+          <option>Technology</option><option>Science</option><option>Fiction</option>
+          <option>Non-Fiction</option><option>History</option><option>Philosophy</option>
+          <option>Business</option><option>Biography</option><option>Other</option>
+        </select>
+      </div>
+      <div class="field"><label>Rating (0–5)</label><input type="number" id="fr" min="0" max="5" step=".1"/></div>
+      <div class="field ff"><label>Notes</label><textarea id="fn"></textarea></div>
+    </div>
+    <div class="mact">
+      <button class="btn btn-g" onclick="closeMod()">Cancel</button>
+      <button class="btn btn-p" id="svbtn" onclick="saveBook()">Save Book</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirm -->
+<div class="ov" id="cmod">
+  <div class="cm">
+    <div class="cmttl">Delete this book?</div>
+    <div class="cmbod">This will be permanently removed from the database.</div>
+    <div class="cmact">
+      <button class="btn btn-g" onclick="closeCnf()">Cancel</button>
+      <button class="btn btn-d" id="cdelbtn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="tws" id="tws"></div>
+
+<script>
+// ── State ─────────────────────────────────────────────────
+let books=[], editId=null, delId=null, paused=false, feedLog=[];
+let imap={}, cidx=0; // instance → {colorIdx, requestCount}
+const COLORS=['#00d4ff','#00e5a0','#a855f7','#ffd32a','#ff6b35','#f472b6'];
+const discovered={}; // instanceId → health data
+
+function gc(id){if(!imap[id])imap[id]={ci:cidx++%COLORS.length,rc:0};return COLORS[imap[id].ci]}
+
+function sw(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('panel-'+name).classList.add('active');
+  if(name==='cat') loadBooks();
+}
+
+// ── Discovery: fire N concurrent /api/health calls ─────────
+// ALB round-robins them → we see different instanceIds
+async function poll(){
+  const calls = Array.from({length:8},()=>
+    fetch('/api/health',{signal:AbortSignal.timeout(5000)})
+      .then(async r=>{
+        const d=await r.json();
+        if(d.instanceId){
+          discovered[d.instanceId]={...d,lastSeen:Date.now()};
+          if(!imap[d.instanceId]) imap[d.instanceId]={ci:cidx++%COLORS.length,rc:0};
+          imap[d.instanceId].rc=d.requestCount||0;
+        }
+      }).catch(()=>{})
+  );
+  await Promise.all(calls);
+
+  // Evict nodes not seen in 45s (terminated by ASG)
+  const now=Date.now();
+  Object.keys(discovered).forEach(id=>{if(now-discovered[id].lastSeen>45000) delete discovered[id];});
+
+  render();
+  document.getElementById('lpoll').textContent='Last poll: '+new Date().toLocaleTimeString();
+}
+
+function render(){
+  const nodes=Object.values(discovered);
+  const healthy=nodes.filter(n=>n.backend&&n.database).length;
+  const total=nodes.length;
+  const totalRc=nodes.reduce((s,n)=>s+(imap[n.instanceId]?.rc||0),0);
+  const lats=nodes.map(n=>n.latencyMs).filter(Boolean);
+  const avgLat=lats.length?Math.round(lats.reduce((a,b)=>a+b,0)/lats.length):null;
+
+  // Header
+  document.getElementById('hbAlb').textContent=total?'ALB: online':'ALB: no response';
+  document.getElementById('hbAlb').className='hb '+(total?'hb-green':'hb-blue');
+  document.getElementById('hbInst').textContent=total+' instance'+(total!==1?'s':'');
+  document.getElementById('hbH').style.display=total?'':'none';
+  document.getElementById('hbH').textContent=healthy+' healthy';
+  document.getElementById('hbH').className='hb '+(healthy===total&&total>0?'hb-green':healthy>0?'hb-warn':'hb-red');
+  document.getElementById('hbRq').style.display=total?'':'none';
+  document.getElementById('hbRq').textContent=totalRc+' reqs';
+
+  // Stats
+  document.getElementById('sInst').textContent=total||'—';
+  document.getElementById('sHlth').textContent=healthy||'—';
+  document.getElementById('sReqs').textContent=totalRc.toLocaleString();
+  document.getElementById('sLat').textContent=avgLat?avgLat+'ms':'—';
+
+  // Alerts
+  if(!total){document.getElementById('aerr').classList.add('show');document.getElementById('aerrm').textContent='No backend instances found. Check that your ASG has running instances and the target group shows them as healthy.';}
+  else document.getElementById('aerr').classList.remove('show');
+  if(total&&healthy<total){document.getElementById('awrn').classList.add('show');document.getElementById('awrnm').textContent=(total-healthy)+' instance(s) are unhealthy or cannot reach the database.';}
+  else document.getElementById('awrn').classList.remove('show');
+
+  document.getElementById('addbtn').disabled=healthy===0;
+
+  if(!nodes.length){
+    document.getElementById('igrid').innerHTML='<div class="grid-empty"><span class="ld"></span> &nbsp;Discovering instances via ALB…</div>';
+    return;
+  }
+
+  const maxRc=Math.max(...nodes.map(n=>imap[n.instanceId]?.rc||0),1);
+  document.getElementById('igrid').innerHTML=nodes.map(n=>{
+    const color=gc(n.instanceId);
+    const rc=imap[n.instanceId]?.rc||0;
+    const pct=Math.round(rc/maxRc*100);
+    const ok=n.backend&&n.database;
+    const sid=n.instanceId.startsWith('i-')?n.instanceId.slice(0,13)+'…':n.instanceId.slice(0,13);
+    return `<div class="icard ${ok?'healthy':'unhealthy'}" id="ic-${esc(n.instanceId)}">
+      <div class="iglow" style="background:${color}"></div>
+      <div class="icard-hdr">
+        <div class="icard-id" style="color:${color}" title="${esc(n.instanceId)}">${esc(sid)}</div>
+        <div class="cdot ${ok?'dg':!n.backend?'dr':'dy'}"></div>
+      </div>
+      <div class="istats">
+        <div><div class="il">Backend</div><div class="iv ${n.backend?'cg':'cr'}">${n.backend?'running':'down'}</div></div>
+        <div><div class="il">Database</div><div class="iv ${n.database?'cg':'cr'}">${n.database?'ok':'error'}</div></div>
+        <div><div class="il">Requests</div><div class="iv ca">${rc.toLocaleString()}</div></div>
+        <div><div class="il">Uptime</div><div class="iv cm">${n.uptime?fup(n.uptime):'—'}</div></div>
+      </div>
+      <div class="hitbar">
+        <div class="hitbar-lbl"><span>Share</span><span>${pct}%</span></div>
+        <div class="hitbar-t"><div class="hitbar-f" style="width:${pct}%;background:${color}"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const totalRc2=nodes.reduce((s,n)=>s+(imap[n.instanceId]?.rc||0),0)||1;
+  document.getElementById('dbars').innerHTML=nodes
+    .sort((a,b)=>(imap[b.instanceId]?.rc||0)-(imap[a.instanceId]?.rc||0))
+    .map(n=>{
+      const color=gc(n.instanceId);
+      const rc=imap[n.instanceId]?.rc||0;
+      const pct=Math.round(rc/totalRc2*100);
+      const sid=n.instanceId.startsWith('i-')?n.instanceId:n.instanceId.slice(0,14);
+      return `<div class="dist-row">
+        <div class="dist-lbl" style="color:${color}" title="${esc(n.instanceId)}">${esc(sid)}</div>
+        <div class="dist-t"><div class="dist-f" style="width:${pct}%;background:${color}"></div></div>
+        <div class="dist-n">${rc.toLocaleString()}</div>
+      </div>`;
+    }).join('');
+}
+
+function fup(s){if(s<60)return s+'s';if(s<3600)return Math.floor(s/60)+'m';return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m'}
+
+// ── Feed ──────────────────────────────────────────────────
+function addFeedEntry(entry){
+  if(paused) return;
+  feedLog.unshift(entry);
+  if(feedLog.length>200) feedLog.pop();
+  const fi=document.getElementById('fi');
+  const emp=fi.querySelector('.feed-empty');
+  if(emp) emp.remove();
+  const color=gc(entry.instanceId);
+  const sc=entry.status>=500?'s5':entry.status>=400?'s4':'s2';
+  const sid=entry.instanceId.startsWith('i-')?entry.instanceId.slice(0,12)+'…':entry.instanceId;
+  const row=document.createElement('div');
+  row.className='frow';
+  row.innerHTML=`<div class="ft">${new Date().toLocaleTimeString()}</div>
+    <div class="fi" style="color:${color}" title="${esc(entry.instanceId)}">${esc(sid)}</div>
+    <div class="fs ${sc}">${entry.status}</div>
+    <div class="fl">${entry.latency}</div>
+    <div class="fr">${esc(entry.req)}</div>`;
+  fi.insertBefore(row,fi.firstChild);
+  while(fi.children.length>150) fi.removeChild(fi.lastChild);
+  document.getElementById('fcnt').textContent='('+feedLog.length+')';
+  const card=document.getElementById('ic-'+entry.instanceId);
+  if(card){card.classList.remove('flash');void card.offsetWidth;card.classList.add('flash');}
+}
+
+function tpause(){paused=!paused;document.getElementById('pbtn').textContent=paused?'▶ Resume':'⏸ Pause';}
+function clrfeed(){feedLog=[];document.getElementById('fi').innerHTML='<div class="feed-empty"><div style="font-size:1.4rem">📡</div>Feed cleared…</div>';document.getElementById('fcnt').textContent='(0)';}
+async function genload(){
+  toast('Sending 12 requests…','inf');
+  const b=document.getElementById('glbtn');b.disabled=true;
+  for(let i=0;i<12;i++){
+    const t=Date.now();
+    fetch('/api/health').then(r=>{
+      const id=r.headers.get('X-Instance-Id')||'?';
+      addFeedEntry({instanceId:id,status:r.status,latency:(Date.now()-t)+'ms',req:'/api/health'});
+    }).catch(()=>{});
+    await new Promise(r=>setTimeout(r,200));
+  }
+  b.disabled=false;
+  setTimeout(poll,600);
+}
+
+// Intercept API fetches for the feed
+const _f=window.fetch;
+window.fetch=function(url,opts){
+  const u=typeof url==='string'?url:'';
+  if(u.startsWith('/api/')&&!u.includes('/health')){
+    const t=Date.now();
+    return _f(url,opts).then(r=>{
+      const id=r.headers.get('X-Instance-Id')||'?';
+      addFeedEntry({instanceId:id,status:r.status,latency:(Date.now()-t)+'ms',req:u});
+      setTimeout(poll,600);
+      return r;
+    });
+  }
+  return _f(url,opts);
+};
+
+// ── Books CRUD ────────────────────────────────────────────
+async function loadBooks(){
+  try{
+    const r=await _f('/api/books');
+    const d=await r.json();
+    if(d.success){
+      books=d.data; renderBooks(books); updGenre();
+      document.getElementById('bcnt').textContent=`${books.length} book${books.length!==1?'s':''} · last served by ${d.servedBy||'?'}`;
+      document.getElementById('aerr2').classList.remove('show');
+      document.getElementById('addbtn').disabled=false;
+    }
+  }catch(e){
+    document.getElementById('aerr2').classList.add('show');
+    document.getElementById('aerrm2').textContent='Cannot reach backend via ALB: '+e.message;
+    document.getElementById('addbtn').disabled=true;
+  }
+}
+
+function renderBooks(list){
+  const tb=document.getElementById('btable');
+  if(!list.length){tb.innerHTML='<tr><td colspan="7"><div class="empty-st">No books yet — add one!</div></td></tr>';return;}
+  tb.innerHTML=list.map(b=>{
+    const color=b.servedBy?gc(b.servedBy):COLORS[0];
+    const sid=b.servedBy?.startsWith('i-')?b.servedBy.slice(0,12)+'…':b.servedBy||'?';
+    return `<tr>
+      <td class="tit">${esc(b.title)}</td><td class="tau">${esc(b.author)}</td>
+      <td class="tyr">${b.year||'—'}</td>
+      <td>${b.genre?`<span class="tge">${esc(b.genre)}</span>`:'—'}</td>
+      <td>${stars(b.rating)}</td>
+      <td><span class="tsv" style="color:${color};background:${color}18;border:1px solid ${color}30" title="${esc(b.servedBy||'')}">${esc(sid)}</span></td>
+      <td><div class="tac">
+        <button class="btn btn-g btn-sm btn-icon" onclick="openEdit(${b.id})">✏️</button>
+        <button class="btn btn-d btn-sm btn-icon" onclick="openDel(${b.id})">🗑️</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function stars(r){
+  if(r==null)return '<span style="color:var(--muted)">—</span>';
+  return `<span class="stars">${'★'.repeat(Math.floor(r))}${'☆'.repeat(5-Math.floor(r))}</span> <span style="font-family:var(--mono);font-size:.65rem;color:var(--muted)">${Number(r).toFixed(1)}</span>`;
+}
+function filterBooks(){
+  const q=document.getElementById('srch').value.toLowerCase();
+  const g=document.getElementById('gfilt').value;
+  renderBooks(books.filter(b=>(!q||b.title.toLowerCase().includes(q)||b.author.toLowerCase().includes(q))&&(!g||b.genre===g)));
+}
+function updGenre(){
+  const gs=[...new Set(books.map(b=>b.genre).filter(Boolean))].sort();
+  const s=document.getElementById('gfilt');const c=s.value;
+  s.innerHTML='<option value="">All genres</option>'+gs.map(g=>`<option${c===g?' selected':''}>${g}</option>`).join('');
+}
+function openAdd(){
+  editId=null;document.getElementById('mttl').textContent='Add Book';document.getElementById('svbtn').textContent='Add Book';
+  ['ft','fa','fy','fg','fr','fn'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('bmod').classList.add('open');document.getElementById('ft').focus();
+}
+function openEdit(id){
+  const b=books.find(x=>x.id===id);if(!b)return;
+  editId=id;document.getElementById('mttl').textContent='Edit Book';document.getElementById('svbtn').textContent='Save Changes';
+  document.getElementById('ft').value=b.title||'';document.getElementById('fa').value=b.author||'';
+  document.getElementById('fy').value=b.year||'';document.getElementById('fg').value=b.genre||'';
+  document.getElementById('fr').value=b.rating||'';document.getElementById('fn').value=b.notes||'';
+  document.getElementById('bmod').classList.add('open');
+}
+function closeMod(){document.getElementById('bmod').classList.remove('open');}
+async function saveBook(){
+  const title=document.getElementById('ft').value.trim();
+  const author=document.getElementById('fa').value.trim();
+  if(!title||!author){toast('Title and author required','err');return;}
+  const payload={title,author,year:document.getElementById('fy').value||null,
+    genre:document.getElementById('fg').value||null,rating:document.getElementById('fr').value||null,
+    notes:document.getElementById('fn').value||null};
+  const btn=document.getElementById('svbtn');btn.disabled=true;btn.innerHTML='<span class="ld"></span> Saving…';
+  try{
+    const r=await _f(editId?`/api/books/${editId}`:'/api/books',
+      {method:editId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const d=await r.json();
+    if(d.success){toast((editId?'Updated':'Added')+' · '+( d.servedBy||'?'),'ok');closeMod();loadBooks();}
+    else toast(d.error||'Failed','err');
+  }catch(e){toast('Network error','err');}
+  finally{btn.disabled=false;btn.textContent=editId?'Save Changes':'Add Book';}
+}
+function openDel(id){delId=id;document.getElementById('cdelbtn').onclick=doDel;document.getElementById('cmod').classList.add('open');}
+function closeCnf(){document.getElementById('cmod').classList.remove('open');delId=null;}
+async function doDel(){
+  if(!delId)return;
+  try{
+    const r=await _f(`/api/books/${delId}`,{method:'DELETE'});
+    const d=await r.json();
+    if(d.success){toast('Deleted · '+(d.servedBy||'?'),'ok');closeCnf();loadBooks();}
+    else toast(d.error||'Failed','err');
+  }catch(e){toast('Network error','err');}
+}
+function toast(msg,type='ok'){
+  const w=document.getElementById('tws');const t=document.createElement('div');
+  t.className='toast t'+type;
+  t.innerHTML=(type==='ok'?'✓':type==='err'?'✕':'ℹ')+' '+msg;
+  w.appendChild(t);setTimeout(()=>t.remove(),4000);
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+poll();
+setInterval(poll,5000);
+</script>
+</body>
+</html>
