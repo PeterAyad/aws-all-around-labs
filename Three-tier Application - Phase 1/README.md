@@ -108,7 +108,7 @@ Before running any scripts, complete these steps in the AWS Console:
 - DB identifier: `labdb`
 - Master username: `postgres`, set a password (for the lab use `postgres`)
 - For the authentication, select `Password authentication` for simplicity
-- VPC: `lab-vpc`, Subnet group: create one using `lab-private-subnet`
+- VPC: `lab-vpc`, Subnet group: create a new one
 - In additional configuration: Set initial database name as `postgres`
 - Use the default values for the rest of the settings and create the DB
 - After the db creation finishes, go to the DB configuration page > **Connectivity & Security**
