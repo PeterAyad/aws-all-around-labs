@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Order Processing — SNS/SQS Lab</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --border: #1e2330;
+    --border-bright: #2e3548;
+    --text: #c9d1e0;
+    --text-dim: #5a6478;
+    --text-bright: #eef1f7;
+    --accent: #00d4aa;
+    --accent-dim: #00d4aa22;
+    --warn: #f5a623;
+    --warn-dim: #f5a62318;
+    --danger: #e8445a;
+    --danger-dim: #e8445a18;
+    --inv: #4f9eff;
+    --notif: #a78bfa;
+    --analytics: #34d399;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* grid noise texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 48px;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .header-left h1 {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text-bright);
+    letter-spacing: -0.5px;
+  }
+
+  .header-left p {
+    margin-top: 6px;
+    font-size: 13px;
+    color: var(--text-dim);
+    font-weight: 300;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: background 0.3s;
+  }
+  .status-dot.live { background: var(--accent); box-shadow: 0 0 6px var(--accent); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+  /* ── Config banner ── */
+  .config-banner {
+    background: var(--warn-dim);
+    border: 1px solid var(--warn);
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin-bottom: 32px;
+    display: none;
+  }
+  .config-banner.visible { display: block; }
+  .config-banner p { font-size: 13px; color: var(--warn); font-family: var(--mono); }
+  .config-banner code { font-size: 12px; opacity: 0.8; }
+
+  /* ── Config panel ── */
+  .config-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 32px;
+  }
+
+  .config-panel h2 {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+  }
+
+  .config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  @media(max-width: 600px) { .config-grid { grid-template-columns: 1fr; } }
+
+  .field label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+  }
+
+  .field input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border-bright);
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-bright);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .field input::placeholder { color: var(--text-dim); }
+
+  .btn-save {
+    margin-top: 16px;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 4px;
+    padding: 9px 20px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn-save:hover { opacity: 0.85; }
+
+  /* ── Architecture diagram ── */
+  .arch {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 32px;
+    overflow-x: auto;
+  }
+
+  .arch h2 {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+  }
+
+  .arch-diagram {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    flex-wrap: nowrap;
+    min-width: 620px;
+  }
+
+  .arch-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .arch-box {
+    background: var(--bg);
+    border: 1px solid var(--border-bright);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    text-align: center;
+    color: var(--text-bright);
+    white-space: nowrap;
+  }
+  .arch-box.highlight { border-color: var(--accent); color: var(--accent); }
+  .arch-box.inv-c { border-color: var(--inv); color: var(--inv); }
+  .arch-box.notif-c { border-color: var(--notif); color: var(--notif); }
+  .arch-box.analytics-c { border-color: var(--analytics); color: var(--analytics); }
+
+  .arch-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+  }
+
+  .arch-arrow {
+    font-family: var(--mono);
+    font-size: 18px;
+    color: var(--border-bright);
+    padding: 0 4px;
+    margin-bottom: 20px;
+  }
+
+  .arch-fanout {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .arch-fanout-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* ── Place Order ── */
+  .order-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 32px;
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .panel-header h2 {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .order-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  @media(max-width: 600px) { .order-form { grid-template-columns: 1fr; } }
+
+  .order-form .field.full { grid-column: 1 / -1; }
+
+  .items-list {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .item-row {
+    display: grid;
+    grid-template-columns: 1fr 80px 32px;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .btn-icon {
+    background: transparent;
+    border: 1px solid var(--border-bright);
+    border-radius: 4px;
+    color: var(--text-dim);
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+  .btn-icon:hover { border-color: var(--danger); color: var(--danger); }
+
+  .btn-add-item {
+    background: transparent;
+    border: 1px dashed var(--border-bright);
+    border-radius: 4px;
+    color: var(--text-dim);
+    padding: 8px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    width: 100%;
+    transition: all 0.2s;
+    grid-column: 1 / -1;
+  }
+  .btn-add-item:hover { border-color: var(--accent); color: var(--accent); }
+
+  .order-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 4px;
+    padding: 10px 24px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+  }
+  .btn-primary:hover:not(:disabled) { opacity: 0.85; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border-bright);
+    color: var(--text-dim);
+    border-radius: 4px;
+    padding: 10px 18px;
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn-secondary:hover { border-color: var(--text-dim); color: var(--text); }
+
+  .toast {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 8px 14px;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+  .toast.success { background: var(--accent-dim); color: var(--accent); border: 1px solid var(--accent); }
+  .toast.error { background: var(--danger-dim); color: var(--danger); border: 1px solid var(--danger); }
+
+  /* ── Order log ── */
+  .log-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 32px;
+  }
+
+  .log-panel h2 {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+  }
+
+  .log-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 260px;
+    overflow-y: auto;
+  }
+
+  .log-entry {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    animation: slideIn 0.3s ease;
+  }
+
+  @keyframes slideIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+
+  .log-time {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  .log-id {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  .log-meta {
+    font-size: 12px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .log-total {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-bright);
+    white-space: nowrap;
+  }
+
+  .log-empty {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    text-align: center;
+    padding: 32px;
+  }
+
+  /* ── Queue status cards ── */
+  .queues-section h2 {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .refresh-btn {
+    background: transparent;
+    border: 1px solid var(--border-bright);
+    color: var(--text-dim);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-family: var(--mono);
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .refresh-btn.spinning { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .queues-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  @media(max-width: 780px) { .queues-grid { grid-template-columns: 1fr; } }
+
+  .queue-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    transition: border-color 0.2s;
+  }
+
+  .queue-card.inv { --card-color: var(--inv); }
+  .queue-card.notif { --card-color: var(--notif); }
+  .queue-card.analytics { --card-color: var(--analytics); }
+  .queue-card:hover { border-color: var(--card-color); }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .card-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--card-color);
+    flex-shrink: 0;
+  }
+
+  .card-title {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--card-color);
+  }
+
+  .card-subtitle {
+    font-size: 10px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    margin-left: auto;
+  }
+
+  .card-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .stat-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 12px;
+  }
+
+  .stat-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+  }
+
+  .stat-value {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text-bright);
+  }
+
+  .stat-value.warn { color: var(--warn); }
+  .stat-value.danger { color: var(--danger); }
+
+  .dlq-bar {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .dlq-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .dlq-label::before {
+    content: '⚠';
+    font-size: 10px;
+    color: var(--warn);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .dlq-label.has-messages::before { opacity: 1; }
+
+  .dlq-count {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-dim);
+  }
+  .dlq-count.has-messages { color: var(--warn); }
+
+  /* ── Recent logs ── */
+  .card-logs {
+    margin-top: 12px;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+
+  .card-logs-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+  }
+
+  .log-line {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 0;
+    color: var(--text-dim);
+    display: flex;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .log-line:last-child { border-bottom: none; }
+  .log-line.success .log-line-msg { color: var(--analytics); }
+  .log-line.error .log-line-msg { color: var(--danger); }
+
+  .log-line-time { flex-shrink: 0; opacity: 0.6; }
+  .log-line-msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .no-logs {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    opacity: 0.5;
+    font-style: italic;
+  }
+
+  /* ── Failure scenarios ── */
+  .failures-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 32px;
+  }
+
+  .failures-panel h2 {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+  }
+
+  .scenario-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  @media(max-width: 600px) { .scenario-grid { grid-template-columns: 1fr; } }
+
+  .scenario-btn {
+    background: var(--bg);
+    border: 1px solid var(--border-bright);
+    border-radius: 6px;
+    padding: 14px 16px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .scenario-btn:hover { border-color: var(--warn); }
+
+  .scenario-title {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--warn);
+  }
+
+  .scenario-desc {
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  .depth-bar-wrap {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 12px;
+    margin-bottom: 0;
+  }
+
+  .depth-bar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .depth-bar-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+  }
+
+  .depth-bar-count {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-bright);
+  }
+  .depth-bar-count.warn { color: var(--warn); }
+  .depth-bar-count.hot { color: var(--danger); }
+
+  .depth-bar-track {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .depth-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--card-color);
+    transition: width 0.6s ease;
+    min-width: 0;
+  }
+  .depth-bar-fill.warn { background: var(--warn); }
+  .depth-bar-fill.hot { background: var(--danger); }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <header>
+    <div class="header-left">
+      <h1>⬡ order-processor</h1>
+      <p>SNS fan-out → SQS queues — AWS messaging lab</p>
+    </div>
+    <div class="status-pill">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">not configured</span>
+    </div>
+  </header>
+
+  <!-- Config banner -->
+  <div class="config-banner" id="configBanner">
+    <p>⚠ Configure your API Gateway URLs below before placing orders.</p>
+    <p style="margin-top:6px;opacity:0.7"><code>Open the panel → paste your API Gateway invoke URL → Save</code></p>
+  </div>
+
+  <!-- Config panel -->
+  <div class="config-panel">
+    <h2>Configuration</h2>
+    <div class="config-grid">
+      <div class="field full">
+        <label>ORDER API URL — POST /orders</label>
+        <input type="text" id="cfgOrdersUrl" placeholder="https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/prod/orders" />
+      </div>
+      <div class="field full">
+        <label>STATUS API URL — GET /status</label>
+        <input type="text" id="cfgStatusUrl" placeholder="https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/prod/status" />
+      </div>
+    </div>
+    <button class="btn-save" onclick="saveConfig()">Save &amp; Connect</button>
+  </div>
+
+  <!-- Architecture -->
+  <div class="arch">
+    <h2>Architecture — Live Fan-Out</h2>
+    <div class="arch-diagram">
+      <div class="arch-node">
+        <div class="arch-box">Browser</div>
+        <div class="arch-label">this page</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node">
+        <div class="arch-box highlight">API Gateway</div>
+        <div class="arch-label">POST /orders</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node">
+        <div class="arch-box highlight">order-receiver<br/>Lambda</div>
+        <div class="arch-label">validates + publishes</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-node">
+        <div class="arch-box highlight">SNS Topic</div>
+        <div class="arch-label">orders-topic</div>
+      </div>
+      <div class="arch-arrow">→</div>
+      <div class="arch-fanout">
+        <div class="arch-fanout-row">
+          <div class="arch-box inv-c">SQS<br/>Inventory</div>
+          <div class="arch-arrow" style="font-size:12px">→</div>
+          <div class="arch-box inv-c">Lambda<br/>inventory</div>
+        </div>
+        <div class="arch-fanout-row">
+          <div class="arch-box notif-c">SQS<br/>Notification</div>
+          <div class="arch-arrow" style="font-size:12px">→</div>
+          <div class="arch-box notif-c">Lambda<br/>notification</div>
+        </div>
+        <div class="arch-fanout-row">
+          <div class="arch-box analytics-c">SQS<br/>Analytics</div>
+          <div class="arch-arrow" style="font-size:12px">→</div>
+          <div class="arch-box analytics-c">Lambda<br/>analytics</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Place Order -->
+  <div class="order-panel">
+    <div class="panel-header">
+      <h2>Place an Order</h2>
+    </div>
+    <div class="order-form">
+      <div class="field">
+        <label>CUSTOMER NAME</label>
+        <input type="text" id="customerName" placeholder="Alice Smith" />
+      </div>
+      <div class="field">
+        <!-- spacer -->
+      </div>
+      <div class="items-list" id="itemsList">
+        <!-- item rows injected here -->
+      </div>
+      <button class="btn-add-item" onclick="addItem()">+ Add Item</button>
+    </div>
+    <div class="order-actions">
+      <button class="btn-primary" id="placeBtn" onclick="placeOrder()">⚡ Place Order</button>
+      <button class="btn-secondary" onclick="loadSample()">Load sample order</button>
+      <div class="toast" id="toast"></div>
+    </div>
+  </div>
+
+  <!-- Order Log -->
+  <div class="log-panel">
+    <h2>Dispatched Orders</h2>
+    <div class="log-list" id="logList">
+      <div class="log-empty" id="logEmpty">No orders placed yet — place an order above to begin.</div>
+    </div>
+  </div>
+
+  <!-- Queue Status -->
+  <div class="queues-section">
+    <h2>
+      Queue &amp; DLQ Status
+      <button class="refresh-btn" id="refreshBtn" onclick="fetchStatus()">↻ Refresh</button>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim);font-weight:300;letter-spacing:0" id="lastRefresh"></span>
+    </h2>
+    <div class="queues-grid" id="queuesGrid">
+      <!-- cards injected here -->
+    </div>
+  </div>
+
+  <!-- Failure Scenarios -->
+  <div class="failures-panel">
+    <h2>⚡ Failure Scenarios</h2>
+    <div class="scenario-grid">
+      <button class="scenario-btn" onclick="sendPoisonInventory()">
+        <div class="scenario-title">☠ Poison: Inventory DLQ</div>
+        <div class="scenario-desc">Places an order with item quantity = 100. The inventory Lambda throws an error after 3 retries — message moves to the inventory DLQ. Other queues process normally.</div>
+      </button>
+      <button class="scenario-btn" onclick="sendPoisonNotification()">
+        <div class="scenario-title">☠ Poison: Notification DLQ</div>
+        <div class="scenario-desc">Places a high-value order (total $10,000). The notification Lambda flags it as fraud and throws — message moves to the notification DLQ. Inventory and analytics still succeed.</div>
+      </button>
+      <button class="scenario-btn" onclick="sendBurst()">
+        <div class="scenario-title">⚡ Burst: 30 rapid orders</div>
+        <div class="scenario-desc">Fires 30 orders in ~5 seconds. Because each consumer Lambda has an 8s delay, messages pile up and queue depths climb visibly on the dashboard. Watch them drain over the next 60 seconds as Lambda works through the backlog.</div>
+      </button>
+      <button class="scenario-btn" onclick="sendMalformed()">
+        <div class="scenario-title">✗ Malformed order (400)</div>
+        <div class="scenario-desc">Sends an incomplete order (missing customer name). API Gateway returns 400 — SNS is never called. Demonstrates input validation before entering the queue system.</div>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── State ──
+let config = { ordersUrl: '', statusUrl: '' };
+let orderLog = [];
+let items = [];
+
+// ── Init ──
+window.onload = () => {
+  const saved = localStorage.getItem('lab-sns-config');
+  if (saved) {
+    config = JSON.parse(saved);
+    document.getElementById('cfgOrdersUrl').value = config.ordersUrl || '';
+    document.getElementById('cfgStatusUrl').value = config.statusUrl || '';
+  }
+  updateStatusPill();
+  addItem();
+  addItem();
+  renderQueues(null);
+  if (config.statusUrl) fetchStatus();
+};
+
+// ── Config ──
+function saveConfig() {
+  config.ordersUrl = document.getElementById('cfgOrdersUrl').value.trim();
+  config.statusUrl = document.getElementById('cfgStatusUrl').value.trim();
+  localStorage.setItem('lab-sns-config', JSON.stringify(config));
+  updateStatusPill();
+  showToast('Configuration saved', 'success');
+  if (config.statusUrl) fetchStatus();
+}
+
+function updateStatusPill() {
+  const dot = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+  const banner = document.getElementById('configBanner');
+  if (config.ordersUrl && config.statusUrl) {
+    dot.className = 'status-dot live';
+    text.textContent = 'connected';
+    banner.classList.remove('visible');
+  } else {
+    dot.className = 'status-dot';
+    text.textContent = 'not configured';
+    banner.classList.add('visible');
+  }
+}
+
+// ── Items ──
+function addItem() {
+  items.push({ name: '', quantity: 1 });
+  renderItems();
+}
+
+function removeItem(i) {
+  items.splice(i, 1);
+  renderItems();
+}
+
+function renderItems() {
+  const list = document.getElementById('itemsList');
+  list.innerHTML = items.map((item, i) => `
+    <div class="item-row">
+      <div class="field">
+        <label>ITEM ${i + 1} NAME</label>
+        <input type="text" value="${item.name}" placeholder="Wireless Keyboard"
+          oninput="items[${i}].name=this.value" />
+      </div>
+      <div class="field">
+        <label>QTY</label>
+        <input type="number" value="${item.quantity}" min="1" max="999"
+          oninput="items[${i}].quantity=parseInt(this.value)||1" />
+      </div>
+      <button class="btn-icon" onclick="removeItem(${i})" title="Remove">×</button>
+    </div>
+  `).join('');
+}
+
+// ── Place Order ──
+async function placeOrder(overrides = {}) {
+  if (!config.ordersUrl) { showToast('Set the Orders API URL first', 'error'); return; }
+
+  const customerName = overrides.customerName || document.getElementById('customerName').value.trim();
+  const orderItems = overrides.items || items.filter(i => i.name.trim());
+  const total = overrides.total || orderItems.reduce((s, i) => s + i.quantity * (10 + Math.random() * 90), 0);
+
+  if (!customerName && !overrides.customerName) { showToast('Enter a customer name', 'error'); return; }
+
+  const btn = document.getElementById('placeBtn');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+
+  try {
+    const res = await fetch(config.ordersUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customerName, items: orderItems, total: parseFloat(total.toFixed(2)) })
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      showToast(`✓ ${data.orderId}`, 'success');
+      orderLog.unshift({ orderId: data.orderId, customerName, itemCount: orderItems.length, total: total.toFixed(2), time: new Date().toLocaleTimeString() });
+      renderLog();
+      setTimeout(fetchStatus, 1500);
+    } else {
+      showToast(`Error: ${data.error || res.status}`, 'error');
+    }
+  } catch (e) {
+    showToast(`Network error: ${e.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⚡ Place Order';
+  }
+}
+
+function renderLog() {
+  const list = document.getElementById('logList');
+  const empty = document.getElementById('logEmpty');
+  if (orderLog.length === 0) { empty.style.display = ''; list.innerHTML = ''; return; }
+  empty.style.display = 'none';
+  list.innerHTML = orderLog.slice(0, 20).map(o => `
+    <div class="log-entry">
+      <span class="log-time">${o.time}</span>
+      <span class="log-id">${o.orderId}</span>
+      <span class="log-meta">${o.customerName} · ${o.itemCount} item${o.itemCount !== 1 ? 's' : ''}</span>
+      <span class="log-total">$${o.total}</span>
+    </div>
+  `).join('');
+}
+
+// ── Scenarios ──
+function loadSample() {
+  document.getElementById('customerName').value = 'Alice Nguyen';
+  items = [{ name: 'Wireless Keyboard', quantity: 1 }, { name: 'USB-C Hub', quantity: 2 }];
+  renderItems();
+}
+
+function sendPoisonInventory() {
+  placeOrder({ customerName: 'Poison Test (Inventory)', items: [{ name: 'Bulk Widget', quantity: 100 }], total: 250 });
+}
+
+function sendPoisonNotification() {
+  placeOrder({ customerName: 'High-Value Customer', items: [{ name: 'Enterprise License', quantity: 1 }], total: 10000 });
+}
+
+async function sendBurst() {
+  if (!config.ordersUrl) { showToast('Set the Orders API URL first', 'error'); return; }
+
+  const COUNT = 30;
+  const names = ['Alice','Bob','Carol','Dave','Eve','Frank','Grace','Hank','Ivy','Jack',
+                  'Karen','Leo','Mia','Nate','Olivia','Paul','Quinn','Rosa','Sam','Tina',
+                  'Uma','Vic','Wendy','Xander','Yara','Zoe','Adam','Beth','Chris','Diana'];
+
+  // Update the burst button to show progress
+  const burstBtn = document.querySelector('.scenario-btn[onclick="sendBurst()"]');
+  if (burstBtn) {
+    burstBtn.querySelector('.scenario-title').textContent = `⚡ Sending 0 / ${COUNT}…`;
+  }
+
+  // Start rapid auto-refresh while burst is running
+  let refreshing = true;
+  const liveRefresh = setInterval(() => { if (config.statusUrl) fetchStatus(); }, 2000);
+
+  for (let i = 0; i < COUNT; i++) {
+    await new Promise(r => setTimeout(r, 150));
+    placeOrder({
+      customerName: names[i],
+      items: [{ name: `Item-${String.fromCharCode(65 + (i % 26))}`, quantity: Math.ceil(Math.random() * 5) }],
+      total: parseFloat((Math.random() * 200 + 10).toFixed(2))
+    });
+    if (burstBtn) {
+      burstBtn.querySelector('.scenario-title').textContent = `⚡ Sending ${i + 1} / ${COUNT}…`;
+    }
+  }
+
+  showToast(`✓ ${COUNT} orders sent — watch the queue depths climb`, 'success');
+
+  // Keep refreshing for 60s to show the queues drain, then stop
+  setTimeout(() => {
+    clearInterval(liveRefresh);
+    if (burstBtn) {
+      burstBtn.querySelector('.scenario-title').textContent = `⚡ Burst: ${COUNT} rapid orders`;
+    }
+  }, 60000);
+}
+
+function sendMalformed() {
+  placeOrder({ customerName: '', items: [], total: 0 });
+}
+
+// ── Queue Status ──
+async function fetchStatus() {
+  if (!config.statusUrl) return;
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('spinning');
+  try {
+    const res = await fetch(config.statusUrl);
+    const data = await res.json();
+    renderQueues(data.queues);
+    document.getElementById('lastRefresh').textContent = `updated ${new Date().toLocaleTimeString()}`;
+  } catch {
+    // silent fail — queue status is optional
+  } finally {
+    btn.classList.remove('spinning');
+  }
+}
+
+// ── Queue depth history for bar scale ──
+const depthPeak = { inventory: 1, notification: 1, analytics: 1 };
+
+function renderQueues(queues) {
+  const grid = document.getElementById('queuesGrid');
+  const domains = [
+    { id: 'inventory', label: 'Inventory', cls: 'inv', desc: 'orders-inventory-queue' },
+    { id: 'notification', label: 'Notification', cls: 'notif', desc: 'orders-notification-queue' },
+    { id: 'analytics', label: 'Analytics', cls: 'analytics', desc: 'orders-analytics-queue' },
+  ];
+  grid.innerHTML = domains.map(d => {
+    const q = queues ? queues.find(x => x.id === d.id) : null;
+    const msgs = q ? q.queue.messages : 0;
+    const inFlight = q ? q.queue.inFlight : 0;
+    const dlqCount = q ? q.dlq.messages : 0;
+    const hasDlq = dlqCount > 0;
+    const logs = q ? q.recentLogs : [];
+
+    // Update peak for scaling the bar
+    if (typeof msgs === 'number' && msgs > depthPeak[d.id]) depthPeak[d.id] = msgs;
+    const peak = Math.max(depthPeak[d.id], 5);
+    const pct = typeof msgs === 'number' ? Math.min((msgs / peak) * 100, 100) : 0;
+    const depthClass = msgs > 20 ? 'hot' : msgs > 5 ? 'warn' : '';
+    const displayMsgs = q ? msgs : '—';
+    const displayFlight = q ? inFlight : '—';
+
+    return `
+      <div class="queue-card ${d.cls}">
+        <div class="card-header">
+          <div class="card-dot"></div>
+          <div class="card-title">${d.label}</div>
+          <div class="card-subtitle">${d.desc}</div>
+        </div>
+
+        <div class="depth-bar-wrap" style="margin-bottom:10px">
+          <div class="depth-bar-header">
+            <span class="depth-bar-label">QUEUED</span>
+            <span class="depth-bar-count ${depthClass}">${displayMsgs}</span>
+          </div>
+          <div class="depth-bar-track">
+            <div class="depth-bar-fill ${depthClass}" style="width:${pct}%"></div>
+          </div>
+        </div>
+
+        <div class="card-stats">
+          <div class="stat-box">
+            <div class="stat-label">IN-FLIGHT</div>
+            <div class="stat-value">${displayFlight}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">PEAK</div>
+            <div class="stat-value" style="font-size:16px;color:var(--text-dim)">${depthPeak[d.id]}</div>
+          </div>
+        </div>
+
+        <div class="dlq-bar">
+          <div class="dlq-label ${hasDlq ? 'has-messages' : ''}">Dead Letter Queue</div>
+          <div class="dlq-count ${hasDlq ? 'has-messages' : ''}">${dlqCount}</div>
+        </div>
+        ${logs.length > 0 ? `
+        <div class="card-logs">
+          <div class="card-logs-title">RECENT EXECUTIONS</div>
+          ${logs.slice(0, 4).map(l => {
+            const isError = l.message.includes('ERROR') || l.message.includes('error');
+            return `<div class="log-line ${isError ? 'error' : 'success'}">
+              <span class="log-line-time">${l.time.slice(11,19)}</span>
+              <span class="log-line-msg">${l.message}</span>
+            </div>`;
+          }).join('')}
+        </div>` : `
+        <div class="card-logs">
+          <div class="no-logs">No recent executions — place an order to see logs</div>
+        </div>`}
+      </div>
+    `;
+  }).join('');
+}
+
+// ── Toast ──
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// Auto-refresh every 5s if configured
+setInterval(() => { if (config.statusUrl) fetchStatus(); }, 5000);
+</script>
+</body>
+</html>
