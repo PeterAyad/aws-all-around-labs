@@ -43,7 +43,7 @@ Every completed lab in this repository is designed to be executed directly in th
 | 14  | **[Lambda Access Lab](./Service%20Access%20Labs/)**                                 | IAM, Lambda         | Understand Lambda Execution Roles and how credentials refresh dynamically.           | 🟢 Ready  |
 | 15  | **[ECS Access Lab](./Service%20Access%20Labs/)**                                    | IAM, ECS            | Learn the critical difference between ECS infrastructure roles and task-level roles. | 🟢 Ready  |
 | 16  | **[EKS Access Lab](./Service%20Access%20Labs/)**                                    | IAM, EKS            | Explore pod-scoped permissions (IRSA via OIDC) inside a Kubernetes cluster.          | 🟢 Ready  |
-| 17  | **[Image Processing Pipeline](./Image%20Processing%20Pipeline/)**                   | SNS, SQS            | Fan out a single order event to three independent processing queues with DLQs.       | 🟢 Ready  |
+| 17  | **[Order Processing](./Order%20Processing/)**                                       | SNS, SQS, Lambda    | Fan out a single order event to three independent queues and observe DLQ behavior.   | 🟢 Ready  |
 
 -----
 
