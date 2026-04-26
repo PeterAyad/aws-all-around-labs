@@ -176,7 +176,7 @@ Instead of building a custom layer, we will use a pre-built layer from the **Kla
 3. Select **Specify an ARN**
 4. Paste the following ARN (valid for `us-east-1`):
    `arn:aws:lambda:us-east-1:770693421928:layer:Klayers-p312-Pillow:10`  
-   *(If you are using a different region, find the corresponding ARN at [klayers.cloud](https://klayers.cloud/v2/p3.12/html/index.html))*
+   *(If you are using a different region, find the corresponding ARN at [klayers.cloud](https://api.klayers.cloud/api/v2/p3.12/layers/latest/us-east-1/))*
 5. Click **Verify** and then **Add**
 
 #### 7d. Give Lambda Access to S3
