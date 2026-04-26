@@ -1,0 +1,20 @@
+{
+  "Comment": "Grayscale Workflow — convert image to black & white",
+  "StartAt": "ProcessGrayscale",
+  "States": {
+    "ProcessGrayscale": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "REPLACE_WITH_LAMBDA_ARN",
+        "Payload": {
+          "bucket.$": "$.detail.bucket.name",
+          "key.$":    "$.detail.object.key",
+          "mode":     "grayscale"
+        }
+      },
+      "ResultPath": "$.result",
+      "End": true
+    }
+  }
+}

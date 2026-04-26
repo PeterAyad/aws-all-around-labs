@@ -1,0 +1,26 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PublicReadForStaticSite",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": [
+        "arn:aws:s3:::REPLACE_WITH_YOUR_BUCKET_NAME/index.html",
+        "arn:aws:s3:::REPLACE_WITH_YOUR_BUCKET_NAME/script.js",
+        "arn:aws:s3:::REPLACE_WITH_YOUR_BUCKET_NAME/processed/*",
+        "arn:aws:s3:::REPLACE_WITH_YOUR_BUCKET_NAME/uploads/*"
+      ]
+    },
+    {
+      "Sid": "PublicUploadFromStaticSite",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:PutObject",
+      "Resource": [
+        "arn:aws:s3:::REPLACE_WITH_YOUR_BUCKET_NAME/uploads/*"
+      ]
+    }
+  ]
+}

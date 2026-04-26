@@ -1,0 +1,20 @@
+{
+  "Comment": "Large Resize Workflow — resize image to 1280x720",
+  "StartAt": "ProcessLarge",
+  "States": {
+    "ProcessLarge": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "REPLACE_WITH_LAMBDA_ARN",
+        "Payload": {
+          "bucket.$": "$.detail.bucket.name",
+          "key.$":    "$.detail.object.key",
+          "mode":     "large"
+        }
+      },
+      "ResultPath": "$.result",
+      "End": true
+    }
+  }
+}
