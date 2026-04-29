@@ -45,6 +45,7 @@ Every completed lab in this repository is designed to be executed directly in th
 | 16  | **[EKS Access Lab](./Service%20Access%20Labs/)**                                    | IAM, EKS                                 | Explore pod-scoped permissions (IRSA via OIDC) inside a Kubernetes cluster.          | 🟢 Ready  |
 | 17  | **[Order Processing](./Order%20Processing/)**                                       | SNS, SQS, Lambda                         | Fan out a single order event to three independent queues and observe DLQ behavior.   | 🟢 Ready  |
 | 18  | **[Serverless Media Factory](./Serverless%20Media%20Factory/)**                     | S3, Step Functions, Event-Bridge, Lambda | Orchestrate a multi-step image pipeline.                                             | 🟢 Ready  |
+| 19  | **[Legacy System Migration](./Legacy%20System%20Migration/)**                       | Amazon MQ, EC2                           | Bridge a retail POS and warehouse system using an AMQP-based RabbitMQ broker.        | 🟢 Ready  |
 
 -----
 
