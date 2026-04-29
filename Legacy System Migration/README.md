@@ -158,18 +158,30 @@ Press **Ctrl+C** to stop the consumer.
 
 ---
 
-## 8. Observe the Queue in the RabbitMQ Console
+## 8. Observe the Queue in the RabbitMQ Console (via SSH Tunnel)
 
-Amazon MQ gives you access to the native **RabbitMQ Management UI**:
+Since the broker is in a private subnet, you will use your EC2 instance as a "bridge" (bastion host) to access the management UI from your local browser.
 
-1. Go to **Amazon MQ → Brokers → retail-broker**
-2. Scroll to **Connections** and click the **RabbitMQ web console** link
-3. Log in with your `admin` credentials
-4. Go to **Queues** — you will see the `orders` queue
-5. Run the **producer** again without the consumer, and watch the **message count** go up
-6. Start the **consumer** and watch the messages drain from the queue in real time
+1. **Create the Tunnel:** On your **local machine** (not the EC2), run the following command in a new terminal window:
 
-> This is the key insight of Amazon MQ: the broker holds messages **durably** until a consumer is ready — decoupling the POS terminal from the warehouse system completely.
+    ```bash
+    ssh -i <your-private-key>.pem -L 8443:<your-broker-hostname>:443 ec2-user@<your-ec2-public-ip>
+    ```
+
+    *Keep this terminal window open to maintain the connection.*
+
+2. **Access the UI:** Open your web browser and go to:
+    **`https://localhost:8443`**
+    *(Note: Your browser will show a security warning because the certificate belongs to AWS, not "localhost". Click **Advanced** and **Proceed/Continue** to bypass this.)*
+
+3. **Log In:** Use the **Username** and **Password** you configured when creating the Amazon MQ broker.
+
+4. **Monitor the Queue:**
+    * Click on the **Queues** tab — you will see the `orders` queue listed.
+    * **Test Decoupling:** Run the `producer.py` script on your EC2 instance while the consumer is **stopped**. Refresh the browser to see the "Ready" message count increase.
+    * **Drain the Queue:** Start the `consumer.py` script and watch the messages disappear from the UI in real-time as they are processed.
+
+> **Key Insight:** Using an SSH tunnel allows you to securely manage private cloud resources without exposing them to the open internet. The RabbitMQ console demonstrates how the broker acts as a durable buffer, ensuring no data is lost even if the consuming application is temporarily offline.
 
 ---
 
